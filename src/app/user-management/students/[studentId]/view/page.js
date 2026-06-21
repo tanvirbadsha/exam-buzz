@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, Eye, Pencil } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { StudentNotFound } from "@/components/student/StudentNotFound";
@@ -18,11 +18,16 @@ function DetailRow({ label, value }) {
   );
 }
 
-function MetricCard({ label, value }) {
+function MetricCard({ action, label, value }) {
   return (
     <article className="rounded-lg border border-border bg-surface-muted p-4">
-      <p className="text-sm font-medium text-muted">{label}</p>
-      <p className="mt-2 text-xl font-bold text-foreground">{value}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-muted">{label}</p>
+          <p className="mt-2 text-xl font-bold text-foreground">{value}</p>
+        </div>
+        {action}
+      </div>
     </article>
   );
 }
@@ -112,6 +117,15 @@ export default function ViewStudentPage() {
             <MetricCard
               label="Purchase amount"
               value={formatStudentCurrency(student.purchaseAmount)}
+              action={
+                <Link
+                  href={`/user-management/students/${student.id}/package-history`}
+                  className="icon-button h-9 w-9 border border-border bg-surface"
+                  aria-label={`View package history for ${student.name}`}
+                >
+                  <Eye size={16} />
+                </Link>
+              }
             />
             <MetricCard
               label="Preliminary exam"
