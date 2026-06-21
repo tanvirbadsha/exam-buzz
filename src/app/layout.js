@@ -1,6 +1,8 @@
 import { Geist, Geist_Mono } from "next/font/google";
+import { cookies } from "next/headers";
 import { AppShell } from "@/components/layout/AppShell";
 import { StoreProvider } from "@/components/providers/StoreProvider";
+import { AUTH_COOKIE_NAME } from "@/lib/auth";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -18,14 +20,17 @@ export const metadata = {
   description: "Exam Buzz admin dashboard",
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  const cookieStore = await cookies();
+  const serverToken = cookieStore.get(AUTH_COOKIE_NAME)?.value || null;
+
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
-        <StoreProvider>
+        <StoreProvider serverToken={serverToken}>
           <AppShell>{children}</AppShell>
         </StoreProvider>
       </body>

@@ -1,11 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import toast from "react-hot-toast";
+import { LOGIN_TOAST_KEY } from "@/lib/auth";
 import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
 
 export function AppShell({ children }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const pathname = usePathname();
+  const isLoginPage = pathname === "/login";
+
+  useEffect(() => {
+    if (isLoginPage) return;
+
+    const shouldShowLoginToast =
+      window.sessionStorage.getItem(LOGIN_TOAST_KEY) === "1";
+
+    if (!shouldShowLoginToast) return;
+
+    window.sessionStorage.removeItem(LOGIN_TOAST_KEY);
+    toast.success("Logged in as Super Admin.");
+  }, [isLoginPage]);
+
+  if (isLoginPage) {
+    return <main className="min-h-dvh bg-app text-foreground">{children}</main>;
+  }
 
   return (
     <div className="flex h-dvh overflow-hidden bg-app text-foreground">

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { useDispatch } from "react-redux";
+import toast from "react-hot-toast";
+import { createExpiredAuthCookieValue, LOGIN_TOAST_KEY } from "@/lib/auth";
 import { logout } from "@/store/authSlice";
 
 export function Header({ onMenuClick }) {
@@ -17,7 +19,10 @@ export function Header({ onMenuClick }) {
 
   const handleLogout = () => {
     startTransition(() => {
+      document.cookie = createExpiredAuthCookieValue();
+      window.sessionStorage.removeItem(LOGIN_TOAST_KEY);
       dispatch(logout());
+      toast.success("Signed out.");
       router.replace("/login");
       router.refresh();
     });
