@@ -13,7 +13,7 @@ export function StatusToggle({
       aria-checked={checked}
       aria-label={label}
       disabled={disabled}
-      onClick={() => onChange(!checked)}
+      onClick={() => onChange?.(!checked)}
       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
         checked ? "bg-emerald-600" : "bg-slate-300"
       } ${disabled ? "cursor-wait opacity-60" : "cursor-pointer"}`}

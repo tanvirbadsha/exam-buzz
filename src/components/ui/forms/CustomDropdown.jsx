@@ -43,7 +43,10 @@ export function CustomDropdown({
     );
   }, [options, searchQuery]);
 
-  const errorId = error ? `${label.replace(/\s+/g, "-").toLowerCase()}-error` : undefined;
+  const fallbackId = placeholder.replace(/\s+/g, "-").toLowerCase();
+  const errorId = error
+    ? `${(label || fallbackId).replace(/\s+/g, "-").toLowerCase()}-error`
+    : undefined;
 
   const openDropdown = () => {
     if (disabled) return;

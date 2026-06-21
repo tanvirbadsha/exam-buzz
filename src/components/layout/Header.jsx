@@ -1,14 +1,13 @@
 "use client";
 
-import { logoutAdmin } from "@/app/actions/auth";
-import { Bell, ChevronRight, LogOut, ShieldCheck, User } from "lucide-react";
+import { Bell, ChevronRight, LogOut, Menu, ShieldCheck, User } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useDispatch } from "react-redux";
 import { useTransition } from "react";
+import { useDispatch } from "react-redux";
 import { logout } from "@/store/authSlice";
 
-export function Header() {
+export function Header({ onMenuClick }) {
   const pathname = usePathname();
   const router = useRouter();
   const dispatch = useDispatch();
@@ -17,29 +16,37 @@ export function Header() {
   const pathSegments = pathname.split("/").filter(Boolean);
 
   const handleLogout = () => {
-    startTransition(async () => {
-      await logoutAdmin();
+    startTransition(() => {
       dispatch(logout());
-
       router.replace("/login");
       router.refresh();
     });
   };
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface px-4 shadow-sm sm:px-6 lg:px-8">
-      <Link
-        href="/"
-        className="flex items-center gap-2 font-bold text-foreground md:hidden"
-      >
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-white">
-          <ShieldCheck size={17} />
-        </span>
-        Wiz Pharma
-      </Link>
+    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface/95 px-4 shadow-sm backdrop-blur sm:px-6 lg:px-8">
+      <div className="flex items-center gap-3 md:hidden">
+        <button
+          type="button"
+          onClick={onMenuClick}
+          className="icon-button h-10 w-10 border border-border"
+          aria-label="Open navigation"
+        >
+          <Menu size={20} />
+        </button>
+        <Link
+          href="/"
+          className="flex items-center gap-2 font-bold text-foreground"
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-white">
+            <ShieldCheck size={17} />
+          </span>
+          Exam Buzz
+        </Link>
+      </div>
 
       <div className="hidden items-center gap-2 text-sm font-medium md:flex">
-        <span className="text-muted">Admin</span>
+        <span className="text-muted">Exam Buzz</span>
         <ChevronRight size={14} className="text-border-strong" />
         {pathSegments.length === 0 ? (
           <span className="font-semibold text-foreground">Dashboard</span>
