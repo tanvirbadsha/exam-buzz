@@ -1,10 +1,18 @@
 "use client";
 
 import { ChevronDown, Search } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+const VIEWPORT_GAP = 8;
+const DROPDOWN_MAX_HEIGHT = 256;
 
 function isPrintableKey(event) {
   return event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey;
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
 }
 
 export function CustomDropdown({
@@ -23,9 +31,16 @@ export function CustomDropdown({
   helperText,
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({
+    left: 0,
+    top: 0,
+    width: 0,
+    maxHeight: DROPDOWN_MAX_HEIGHT,
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const wrapperRef = useRef(null);
+  const menuRef = useRef(null);
   const inputRef = useRef(null);
 
   const selectedOption = useMemo(
@@ -48,9 +63,30 @@ export function CustomDropdown({
     ? `${(label || fallbackId).replace(/\s+/g, "-").toLowerCase()}-error`
     : undefined;
 
+  const updateMenuPosition = useCallback(() => {
+    const trigger = wrapperRef.current;
+    if (!trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const width = Math.max(rect.width, 220);
+    const maxLeft = window.innerWidth - width - VIEWPORT_GAP;
+    const left = clamp(rect.left, VIEWPORT_GAP, maxLeft);
+    const spaceBelow = window.innerHeight - rect.bottom - VIEWPORT_GAP;
+    const spaceAbove = rect.top - VIEWPORT_GAP;
+    const openUp = spaceBelow < 180 && spaceAbove > spaceBelow;
+    const availableHeight = openUp ? spaceAbove : spaceBelow;
+    const maxHeight = Math.max(144, Math.min(DROPDOWN_MAX_HEIGHT, availableHeight));
+    const top = openUp
+      ? Math.max(VIEWPORT_GAP, rect.top - maxHeight - VIEWPORT_GAP)
+      : rect.bottom + VIEWPORT_GAP;
+
+    setMenuPosition({ left, top, width, maxHeight });
+  }, []);
+
   const openDropdown = () => {
     if (disabled) return;
     setHighlightedIndex(0);
+    updateMenuPosition();
     setIsOpen(true);
   };
 
@@ -71,15 +107,29 @@ export function CustomDropdown({
     inputRef.current?.focus();
 
     const handlePointerDown = (event) => {
-      if (!wrapperRef.current?.contains(event.target)) {
-        closeDropdown();
+      const target = event.target;
+      if (
+        wrapperRef.current?.contains(target) ||
+        menuRef.current?.contains(target)
+      ) {
+        return;
       }
+
+      closeDropdown();
     };
 
-    document.addEventListener("pointerdown", handlePointerDown);
+    const handleViewportChange = () => updateMenuPosition();
 
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [isOpen]);
+    document.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
+    };
+  }, [isOpen, updateMenuPosition]);
 
   const handleTriggerKeyDown = (event) => {
     if (disabled) return;
@@ -167,8 +217,17 @@ export function CustomDropdown({
         />
       </button>
 
-      {isOpen && (
-        <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-lg border border-border bg-surface shadow-md">
+      {isOpen &&
+        createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            left: `${menuPosition.left}px`,
+            top: `${menuPosition.top}px`,
+            width: `${menuPosition.width}px`,
+          }}
+          className="fixed z-[100] overflow-hidden rounded-lg border border-border bg-surface shadow-xl ring-1 ring-slate-950/5"
+        >
           <div className="flex items-center border-b border-border px-3">
             <Search size={15} className="mr-2 shrink-0 text-muted" />
             <input
@@ -185,7 +244,11 @@ export function CustomDropdown({
             />
           </div>
 
-          <div className="max-h-64 overflow-y-auto py-1" role="listbox">
+          <div
+            className="overflow-y-auto py-1"
+            style={{ maxHeight: `${menuPosition.maxHeight}px` }}
+            role="listbox"
+          >
             {isLoading ? (
               <div className="px-3 py-2 text-sm text-muted">{loadingText}</div>
             ) : filteredOptions.length > 0 ? (
@@ -221,7 +284,8 @@ export function CustomDropdown({
               <div className="px-3 py-2 text-sm text-muted">{emptyText}</div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {helperText && !error && <span className="text-xs text-muted">{helperText}</span>}
