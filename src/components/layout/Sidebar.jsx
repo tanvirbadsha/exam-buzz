@@ -191,7 +191,7 @@ export function Sidebar({ isOpen = false, onClose }) {
         />
       )}
 
-      <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-white/10 bg-sidebar text-slate-200 md:flex">
+      <aside className="hidden h-dvh min-h-0 w-64 shrink-0 flex-col border-r border-white/10 bg-sidebar text-slate-200 md:flex">
         <SidebarContent />
       </aside>
 
