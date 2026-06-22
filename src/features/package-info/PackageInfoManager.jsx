@@ -74,6 +74,7 @@ function PackageMetric({ icon: Icon, label, value }) {
 
 function PackageCard({ packageInfo, onDelete, onEdit, onStatusChange }) {
   const isActive = packageInfo.status === "active";
+  const rulesHtml = packageInfo.rulesHtml;
   const permissionGroups = useMemo(
     () => getPermissionGroups(packageInfo.permissions),
     [packageInfo.permissions],
@@ -240,19 +241,26 @@ function PackageCard({ packageInfo, onDelete, onEdit, onStatusChange }) {
                   Applied conditions
                 </h3>
               </div>
-              <div className="space-y-2">
-                {packageInfo.rules.map((rule, index) => (
-                  <div
-                    key={`${packageInfo.id}-rule-${rule}`}
-                    className="flex gap-3 rounded-lg border border-border bg-surface-muted px-3 py-3"
-                  >
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white text-xs font-black text-brand-strong">
-                      {index + 1}
-                    </span>
-                    <p className="text-sm leading-6 text-foreground">{rule}</p>
-                  </div>
-                ))}
-              </div>
+              {rulesHtml ? (
+                <div
+                  className="tiptap-rendered rounded-lg border border-border bg-surface-muted px-4 py-3 text-sm leading-6 text-foreground"
+                  dangerouslySetInnerHTML={{ __html: rulesHtml }}
+                />
+              ) : (
+                <div className="space-y-2">
+                  {packageInfo.rules.map((rule, index) => (
+                    <div
+                      key={`${packageInfo.id}-rule-${rule}`}
+                      className="flex gap-3 rounded-lg border border-border bg-surface-muted px-3 py-3"
+                    >
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white text-xs font-black text-brand-strong">
+                        {index + 1}
+                      </span>
+                      <p className="text-sm leading-6 text-foreground">{rule}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
 
             <section className="min-w-0">

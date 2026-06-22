@@ -122,4 +122,54 @@ textarea:disabled {
   .back-link {
     @apply inline-flex items-center gap-1.5 text-sm font-semibold text-brand-strong transition-colors hover:text-brand;
   }
+
+  .tiptap-editor-content p,
+  .tiptap-rendered p {
+    @apply my-2;
+  }
+
+  .tiptap-editor-content h1,
+  .tiptap-rendered h1 {
+    @apply my-3 text-2xl font-black leading-tight text-foreground;
+  }
+
+  .tiptap-editor-content h2,
+  .tiptap-rendered h2 {
+    @apply my-3 text-xl font-black leading-tight text-foreground;
+  }
+
+  .tiptap-editor-content h3,
+  .tiptap-rendered h3 {
+    @apply my-2 text-lg font-bold leading-tight text-foreground;
+  }
+
+  .tiptap-editor-content ul,
+  .tiptap-rendered ul {
+    @apply my-3 list-outside list-disc space-y-1 pl-6;
+  }
+
+  .tiptap-editor-content ol,
+  .tiptap-rendered ol {
+    @apply my-3 list-outside list-decimal space-y-1 pl-6;
+  }
+
+  .tiptap-editor-content li,
+  .tiptap-rendered li {
+    @apply pl-1;
+  }
+
+  .tiptap-editor-content li p,
+  .tiptap-rendered li p {
+    @apply my-0;
+  }
+
+  .tiptap-editor-content img,
+  .tiptap-rendered img {
+    @apply my-3 max-w-full rounded-lg border border-border;
+  }
+
+  .tiptap-editor-content a,
+  .tiptap-rendered a {
+    @apply font-semibold text-brand-strong underline underline-offset-2;
+  }
 }

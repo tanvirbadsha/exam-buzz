@@ -13,9 +13,11 @@ import {
 import { useMemo, useState } from "react";
 import { CustomDropdown } from "@/components/ui/forms/CustomDropdown";
 import { TextInput } from "@/components/ui/forms/TextInput";
+import Tiptap from "@/components/text-editor/Tiptap";
 import {
   PACKAGE_STATUS_OPTIONS,
   PACKAGE_TYPE_OPTIONS,
+  packageRulesToHtml,
 } from "@/lib/packageInfoData";
 
 const statusOptions = PACKAGE_STATUS_OPTIONS.filter(
@@ -36,6 +38,7 @@ const emptyPackage = {
   imageUrl: "",
   summary: "",
   rules: [],
+  rulesHtml: "<p></p>",
   permissions: [],
 };
 
@@ -50,9 +53,8 @@ function buildInitialForm(packageInfo) {
 
   return {
     ...mergedPackage,
-    rules: Array.isArray(mergedPackage.rules)
-      ? mergedPackage.rules.join("\n")
-      : mergedPackage.rules,
+    rulesHtml:
+      mergedPackage.rulesHtml || packageRulesToHtml(mergedPackage.rules),
     permissions: Array.isArray(mergedPackage.permissions)
       ? permissionsToText(mergedPackage.permissions)
       : mergedPackage.permissions,
@@ -236,21 +238,21 @@ export function PackageInfoForm({
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="space-y-4">
         <div className="field-group">
-          <label htmlFor="rules" className="field-label">
+          <label className="field-label">
             Rules
           </label>
-          <textarea
-            id="rules"
-            name="rules"
-            rows={7}
-            value={form.rules}
-            onChange={(event) => updateField("rules", event.target.value)}
-            className="min-h-40 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-brand focus:ring-2 focus:ring-brand-soft"
-            placeholder="One rule per line"
+          <Tiptap
+            ariaLabel="Package rules editor"
+            value={form.rulesHtml}
+            onChange={(html) => updateField("rulesHtml", html)}
+            minHeight={260}
+            placeholder="Write package rules and conditions..."
           />
-          <span className="text-xs text-muted">One condition per line.</span>
+          <span className="text-xs text-muted">
+            Format rules with lists, colors, alignment, links and images.
+          </span>
         </div>
         <div className="field-group">
           <label htmlFor="permissions" className="field-label">

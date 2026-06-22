@@ -180,3 +180,42 @@ export function createPackageId() {
 export function formatPackageCurrency(amount, currency = "BDT") {
   return `${Number(amount || 0).toLocaleString("en-BD")} ${currency}`;
 }
+
+export function packageRulesToHtml(rules = []) {
+  if (typeof rules === "string" && /<\/?[a-z][\s\S]*>/i.test(rules)) {
+    return rules;
+  }
+
+  const ruleList = Array.isArray(rules)
+    ? rules
+    : String(rules || "")
+        .split("\n")
+        .map((rule) => rule.trim())
+        .filter(Boolean);
+
+  if (ruleList.length === 0) return "<p></p>";
+
+  return `<ol>${ruleList
+    .map((rule) => `<li>${String(rule).replace(/[<>&]/g, (character) => {
+      const entities = { "<": "&lt;", ">": "&gt;", "&": "&amp;" };
+      return entities[character];
+    })}</li>`)
+    .join("")}</ol>`;
+}
+
+export function htmlToPackageRuleLines(html = "") {
+  const blockSeparatedText = String(html)
+    .replace(/<li[^>]*>/gi, "\n")
+    .replace(/<\/(p|div|h[1-6]|li)>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">");
+
+  return blockSeparatedText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}

@@ -4,6 +4,8 @@ import { useCallback, useMemo, useSyncExternalStore } from "react";
 import {
   PACKAGE_INFO_STORAGE_KEY,
   createPackageId,
+  htmlToPackageRuleLines,
+  packageRulesToHtml,
 } from "@/lib/packageInfoData";
 
 let cachedRawPackages = null;
@@ -111,6 +113,8 @@ function normalizePermissions(value) {
 }
 
 function normalizePackage(packageInput, currentPackage = {}) {
+  const rulesHtml = packageInput.rulesHtml || packageRulesToHtml(packageInput.rules);
+
   return {
     ...currentPackage,
     id: currentPackage.id || createPackageId(),
@@ -126,7 +130,8 @@ function normalizePackage(packageInput, currentPackage = {}) {
     url: packageInput.url?.trim() || "",
     imageUrl: packageInput.imageUrl?.trim() || "",
     summary: packageInput.summary?.trim() || "",
-    rules: normalizeLines(packageInput.rules),
+    rules: htmlToPackageRuleLines(rulesHtml),
+    rulesHtml,
     permissions: normalizePermissions(packageInput.permissions),
   };
 }
