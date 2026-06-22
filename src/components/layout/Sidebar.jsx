@@ -39,9 +39,16 @@ const menuItems = [
     href: "/courses",
   },
   {
-    label: "Package Info",
+    label: "Packages",
     icon: PackageCheck,
-    href: "/packages",
+    isDropdown: true,
+    children: [
+      { label: "Package info", href: "/package-management/packages" },
+      {
+        label: "Assign Package",
+        href: "/package-management/assign-package",
+      },
+    ],
   },
   {
     label: "Users",

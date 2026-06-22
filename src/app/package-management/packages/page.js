@@ -11,3 +11,4 @@ export default async function PackageInfoPage() {
 
   return <PackageInfoManager initialPackages={packages} />;
 }
+
