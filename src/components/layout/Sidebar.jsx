@@ -6,6 +6,7 @@ import {
   ChevronRight,
   GraduationCap,
   LayoutDashboard,
+  Megaphone,
   MessageSquareText,
   PackageCheck,
   Settings,
@@ -65,6 +66,11 @@ const menuItems = [
     label: "Student Request",
     icon: MessageSquareText,
     href: "/student-request",
+  },
+  {
+    label: "Notice Board",
+    icon: Megaphone,
+    href: "/notice-board",
   },
   {
     label: "Roles & Access",
