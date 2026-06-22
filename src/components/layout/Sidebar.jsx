@@ -2,6 +2,7 @@
 
 import {
   BookOpenCheck,
+  CalendarClock,
   ChevronDown,
   ChevronRight,
   GraduationCap,
@@ -71,6 +72,11 @@ const menuItems = [
     label: "Notice Board",
     icon: Megaphone,
     href: "/notice-board",
+  },
+  {
+    label: "Class Routine",
+    icon: CalendarClock,
+    href: "/class-routine",
   },
   {
     label: "Roles & Access",
