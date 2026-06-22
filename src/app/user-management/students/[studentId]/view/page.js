@@ -1,11 +1,11 @@
 "use client";
 
+import { StudentNotFound } from "@/features/users/student/StudentNotFound";
+import { useStudentManagement } from "@/hooks/useStudentManagement";
+import { formatStudentCurrency } from "@/lib/studentData";
 import { ArrowLeft, Eye, Pencil } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { StudentNotFound } from "@/components/student/StudentNotFound";
-import { useStudentManagement } from "@/hooks/useStudentManagement";
-import { formatStudentCurrency } from "@/lib/studentData";
 
 function DetailRow({ label, value }) {
   return (
@@ -98,8 +98,14 @@ export default function ViewStudentPage() {
           <dl>
             <DetailRow label="Phone" value={student.phone} />
             <DetailRow label="Email" value={student.email || "Not provided"} />
-            <DetailRow label="Address" value={student.address || "Not provided"} />
-            <DetailRow label="Purchased package" value={student.purchasedPackage} />
+            <DetailRow
+              label="Address"
+              value={student.address || "Not provided"}
+            />
+            <DetailRow
+              label="Purchased package"
+              value={student.purchasedPackage}
+            />
             <DetailRow
               label="Created"
               value={new Intl.DateTimeFormat("en", {

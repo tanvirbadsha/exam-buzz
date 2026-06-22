@@ -1,12 +1,12 @@
 "use client";
 
+import { AdminAccessControlForm } from "@/features/users/admin/AdminAccessControlForm";
+import { AdminNotFound } from "@/features/users/admin/AdminNotFound";
+import { useAdminManagement } from "@/hooks/useAdminManagement";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { AdminAccessControlForm } from "@/components/admin/AdminAccessControlForm";
-import { AdminNotFound } from "@/components/admin/AdminNotFound";
-import { useAdminManagement } from "@/hooks/useAdminManagement";
 
 export default function AdminAccessControlPage() {
   const { adminId } = useParams();

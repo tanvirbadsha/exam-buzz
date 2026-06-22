@@ -1,12 +1,12 @@
 "use client";
 
+import { AdminForm } from "@/features/users/admin/AdminForm";
+import { AdminNotFound } from "@/features/users/admin/AdminNotFound";
+import { useAdminManagement } from "@/hooks/useAdminManagement";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { AdminForm } from "@/components/admin/AdminForm";
-import { AdminNotFound } from "@/components/admin/AdminNotFound";
-import { useAdminManagement } from "@/hooks/useAdminManagement";
 
 export default function EditAdminPage() {
   const { adminId } = useParams();

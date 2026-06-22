@@ -1,17 +1,5 @@
 "use client";
 
-import {
-  ArrowDown,
-  ArrowUp,
-  ChevronsUpDown,
-  Plus,
-  RotateCcw,
-} from "lucide-react";
-import { useDeferredValue, useMemo, useState } from "react";
-import toast from "react-hot-toast";
-import { CreateTeacherModal } from "@/components/teacher/CreateTeacherModal";
-import { PermissionTags } from "@/components/teacher/PermissionTags";
-import { TeacherActionMenu } from "@/components/teacher/TeacherActionMenu";
 import CustomSearch from "@/components/ui/CustomSearch";
 import {
   Table,
@@ -24,8 +12,20 @@ import {
   TableTh,
 } from "@/components/ui/CustomTable";
 import { CustomDropdown } from "@/components/ui/forms/CustomDropdown";
+import { CreateTeacherModal } from "@/features/users/teacher/CreateTeacherModal";
+import { PermissionTags } from "@/features/users/teacher/PermissionTags";
+import { TeacherActionMenu } from "@/features/users/teacher/TeacherActionMenu";
 import { useTeacherManagement } from "@/hooks/useTeacherManagement";
 import { TEACHER_PERMISSION_OPTIONS, formatCurrency } from "@/lib/teacherData";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronsUpDown,
+  Plus,
+  RotateCcw,
+} from "lucide-react";
+import { useDeferredValue, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 
 const permissionOptions = [
   { label: "All permissions", value: "all" },

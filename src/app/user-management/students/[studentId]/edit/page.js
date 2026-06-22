@@ -1,12 +1,12 @@
 "use client";
 
+import { StudentForm } from "@/features/users/student/StudentForm";
+import { StudentNotFound } from "@/features/users/student/StudentNotFound";
+import { useStudentManagement } from "@/hooks/useStudentManagement";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { StudentForm } from "@/components/student/StudentForm";
-import { StudentNotFound } from "@/components/student/StudentNotFound";
-import { useStudentManagement } from "@/hooks/useStudentManagement";
 
 export default function EditStudentPage() {
   const { studentId } = useParams();

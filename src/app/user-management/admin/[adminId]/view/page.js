@@ -1,12 +1,12 @@
 "use client";
 
+import { AdminAvatar } from "@/features/users/admin/AdminAvatar";
+import { AdminNotFound } from "@/features/users/admin/AdminNotFound";
+import { useAdminManagement } from "@/hooks/useAdminManagement";
+import { ADMIN_MENU_OPTIONS, getRoleLabel } from "@/lib/adminData";
 import { ArrowLeft, KeyRound, Pencil } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { AdminAvatar } from "@/components/admin/AdminAvatar";
-import { AdminNotFound } from "@/components/admin/AdminNotFound";
-import { useAdminManagement } from "@/hooks/useAdminManagement";
-import { ADMIN_MENU_OPTIONS, getRoleLabel } from "@/lib/adminData";
 
 function AdminDetailRow({ label, value }) {
   return (
@@ -34,9 +34,9 @@ export default function ViewAdminPage() {
 
   if (!admin) return <AdminNotFound />;
 
-  const accessLabels = ADMIN_MENU_OPTIONS.flatMap((group) => group.items).filter(
-    (item) => admin.accessKeys.includes(item.key),
-  );
+  const accessLabels = ADMIN_MENU_OPTIONS.flatMap(
+    (group) => group.items,
+  ).filter((item) => admin.accessKeys.includes(item.key));
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">

@@ -1,12 +1,12 @@
 "use client";
 
+import { TeacherForm } from "@/features/users/teacher/TeacherForm";
+import { TeacherNotFound } from "@/features/users/teacher/TeacherNotFound";
+import { useTeacherManagement } from "@/hooks/useTeacherManagement";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { TeacherForm } from "@/components/teacher/TeacherForm";
-import { TeacherNotFound } from "@/components/teacher/TeacherNotFound";
-import { useTeacherManagement } from "@/hooks/useTeacherManagement";
 
 export default function EditTeacherPage() {
   const { teacherId } = useParams();

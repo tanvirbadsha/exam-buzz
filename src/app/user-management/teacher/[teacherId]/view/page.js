@@ -1,12 +1,12 @@
 "use client";
 
+import { PermissionTags } from "@/features/users/teacher/PermissionTags";
+import { TeacherNotFound } from "@/features/users/teacher/TeacherNotFound";
+import { useTeacherManagement } from "@/hooks/useTeacherManagement";
+import { formatCurrency } from "@/lib/teacherData";
 import { ArrowLeft, Pencil } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { PermissionTags } from "@/components/teacher/PermissionTags";
-import { TeacherNotFound } from "@/components/teacher/TeacherNotFound";
-import { useTeacherManagement } from "@/hooks/useTeacherManagement";
-import { formatCurrency } from "@/lib/teacherData";
 
 function DetailRow({ label, value }) {
   return (
@@ -73,9 +73,7 @@ export default function ViewTeacherPage() {
           <h2 className="text-xl font-bold text-foreground">
             {teacher.fullName}
           </h2>
-          <p className="mt-1 text-sm font-medium text-muted">
-            {teacher.email}
-          </p>
+          <p className="mt-1 text-sm font-medium text-muted">{teacher.email}</p>
         </div>
 
         <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_22rem]">

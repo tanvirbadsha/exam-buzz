@@ -1,11 +1,5 @@
 "use client";
 
-import { Plus, ShieldCheck, UsersRound } from "lucide-react";
-import { useDeferredValue, useMemo, useState } from "react";
-import toast from "react-hot-toast";
-import { AdminActionMenu } from "@/components/admin/AdminActionMenu";
-import { AdminAvatar } from "@/components/admin/AdminAvatar";
-import { CreateAdminModal } from "@/components/admin/CreateAdminModal";
 import CustomSearch from "@/components/ui/CustomSearch";
 import {
   Table,
@@ -17,8 +11,14 @@ import {
   TableTd,
   TableTh,
 } from "@/components/ui/CustomTable";
+import { AdminActionMenu } from "@/features/users/admin/AdminActionMenu";
+import { AdminAvatar } from "@/features/users/admin/AdminAvatar";
+import { CreateAdminModal } from "@/features/users/admin/CreateAdminModal";
 import { useAdminManagement } from "@/hooks/useAdminManagement";
 import { getRoleLabel } from "@/lib/adminData";
+import { Plus, ShieldCheck, UsersRound } from "lucide-react";
+import { useDeferredValue, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 
 export default function AdminManagementPage() {
   const { admins, createAdmin, deleteAdmin } = useAdminManagement();
@@ -31,7 +31,13 @@ export default function AdminManagementPage() {
     if (!query) return admins;
 
     return admins.filter((admin) =>
-      [admin.name, admin.phone, admin.email, admin.address, getRoleLabel(admin.role)]
+      [
+        admin.name,
+        admin.phone,
+        admin.email,
+        admin.address,
+        getRoleLabel(admin.role),
+      ]
         .join(" ")
         .toLowerCase()
         .includes(query),
@@ -162,7 +168,9 @@ export default function AdminManagementPage() {
                         </p>
                       </div>
                     </TableTd>
-                    <TableTd className="whitespace-nowrap">{admin.phone}</TableTd>
+                    <TableTd className="whitespace-nowrap">
+                      {admin.phone}
+                    </TableTd>
                     <TableTd>{admin.email}</TableTd>
                     <TableTd className="min-w-48">{admin.address}</TableTd>
                     <TableTd>

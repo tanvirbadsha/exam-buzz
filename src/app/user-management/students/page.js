@@ -1,16 +1,5 @@
 "use client";
 
-import {
-  ArrowDown,
-  ArrowUp,
-  ChevronsUpDown,
-  Plus,
-  RotateCcw,
-} from "lucide-react";
-import { useDeferredValue, useMemo, useState } from "react";
-import toast from "react-hot-toast";
-import { CreateStudentModal } from "@/components/student/CreateStudentModal";
-import { StudentActionMenu } from "@/components/student/StudentActionMenu";
 import CustomSearch from "@/components/ui/CustomSearch";
 import {
   Table,
@@ -24,12 +13,23 @@ import {
 } from "@/components/ui/CustomTable";
 import { StatusToggle } from "@/components/ui/StatusToggle";
 import { CustomDropdown } from "@/components/ui/forms/CustomDropdown";
+import { CreateStudentModal } from "@/features/users/student/CreateStudentModal";
+import { StudentActionMenu } from "@/features/users/student/StudentActionMenu";
 import { useStudentManagement } from "@/hooks/useStudentManagement";
 import {
   STUDENT_PACKAGE_OPTIONS,
   STUDENT_STATUS_OPTIONS,
   formatStudentCurrency,
 } from "@/lib/studentData";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronsUpDown,
+  Plus,
+  RotateCcw,
+} from "lucide-react";
+import { useDeferredValue, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 
 const sortableColumns = [
   { label: "Purchased Package", key: "purchasedPackageCount" },
@@ -58,12 +58,8 @@ function SortableHeader({ label, sortKey, activeSort, onSort }) {
 }
 
 export default function StudentManagementPage() {
-  const {
-    createStudent,
-    deleteStudent,
-    students,
-    updateStudentStatus,
-  } = useStudentManagement();
+  const { createStudent, deleteStudent, students, updateStudentStatus } =
+    useStudentManagement();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [packageFilter, setPackageFilter] = useState("all");
@@ -305,9 +301,7 @@ export default function StudentManagementPage() {
                         />
                         <span
                           className={`text-xs font-bold ${
-                            student.isActive
-                              ? "text-emerald-700"
-                              : "text-muted"
+                            student.isActive ? "text-emerald-700" : "text-muted"
                           }`}
                         >
                           {student.isActive ? "Active" : "Inactive"}

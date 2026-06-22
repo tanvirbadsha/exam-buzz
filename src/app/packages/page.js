@@ -1,4 +1,4 @@
-import { PackageInfoManager } from "@/components/package-info/PackageInfoManager";
+import { PackageInfoManager } from "@/features/package-info/PackageInfoManager";
 import { DEFAULT_PACKAGE_INFO } from "@/lib/packageInfoData";
 
 async function getPackageInfo() {
