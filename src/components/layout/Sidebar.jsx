@@ -6,6 +6,7 @@ import {
   ChevronRight,
   GraduationCap,
   LayoutDashboard,
+  MessageSquareText,
   PackageCheck,
   Settings,
   ShieldAlert,
@@ -59,6 +60,11 @@ const menuItems = [
       { label: "Teacher", href: "/user-management/teacher" },
       { label: "Students", href: "/user-management/students" },
     ],
+  },
+  {
+    label: "Student Request",
+    icon: MessageSquareText,
+    href: "/student-request",
   },
   {
     label: "Roles & Access",
