@@ -6,6 +6,7 @@ import {
   ChevronRight,
   GraduationCap,
   LayoutDashboard,
+  PackageCheck,
   Settings,
   ShieldAlert,
   UserRoundCog,
@@ -36,6 +37,11 @@ const menuItems = [
     label: "Courses",
     icon: GraduationCap,
     href: "/courses",
+  },
+  {
+    label: "Package Info",
+    icon: PackageCheck,
+    href: "/packages",
   },
   {
     label: "Users",
