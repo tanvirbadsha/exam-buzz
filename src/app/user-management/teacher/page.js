@@ -11,12 +11,9 @@ import {
   TableTd,
   TableTh,
 } from "@/components/ui/CustomTable";
-import { CustomDropdown } from "@/components/ui/forms/CustomDropdown";
 import { CreateTeacherModal } from "@/features/users/teacher/CreateTeacherModal";
-import { PermissionTags } from "@/features/users/teacher/PermissionTags";
 import { TeacherActionMenu } from "@/features/users/teacher/TeacherActionMenu";
 import { useTeacherManagement } from "@/hooks/useTeacherManagement";
-import { TEACHER_PERMISSION_OPTIONS, formatCurrency } from "@/lib/teacherData";
 import {
   ArrowDown,
   ArrowUp,
@@ -27,19 +24,9 @@ import {
 import { useDeferredValue, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
-const permissionOptions = [
-  { label: "All permissions", value: "all" },
-  ...TEACHER_PERMISSION_OPTIONS.map((permission) => ({
-    label: permission,
-    value: permission,
-  })),
-];
-
 const sortableColumns = [
-  { label: "Total Withdrawal", key: "totalWithdrawal", align: "right" },
-  { label: "Total Earning", key: "totalEarning", align: "right" },
-  { label: "Pending Withdrawal", key: "pendingWithdrawal", align: "right" },
-  { label: "Total Assesment", key: "totalAssessment", align: "right" },
+  { label: "Total Assign Paper", key: "totalAssignPaper" },
+  { label: "Total Submitted Paper", key: "totalSubmittedPaper" },
 ];
 
 function SortableHeader({ label, sortKey, activeSort, onSort }) {
@@ -66,9 +53,8 @@ export default function TeacherManagementPage() {
   const { teachers, createTeacher, deleteTeacher } = useTeacherManagement();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [permissionFilter, setPermissionFilter] = useState("all");
   const [sortConfig, setSortConfig] = useState({
-    key: "totalEarning",
+    key: "totalAssignPaper",
     direction: "desc",
   });
   const deferredSearchQuery = useDeferredValue(searchQuery);
@@ -83,13 +69,10 @@ export default function TeacherManagementPage() {
           .join(" ")
           .toLowerCase()
           .includes(query);
-      const matchesPermission =
-        permissionFilter === "all" ||
-        teacher.permissions.includes(permissionFilter);
 
-      return matchesSearch && matchesPermission;
+      return matchesSearch;
     });
-  }, [deferredSearchQuery, permissionFilter, teachers]);
+  }, [deferredSearchQuery, teachers]);
 
   const sortedTeachers = useMemo(() => {
     return [...filteredTeachers].sort((a, b) => {
@@ -120,8 +103,7 @@ export default function TeacherManagementPage() {
 
   const resetFilters = () => {
     setSearchQuery("");
-    setPermissionFilter("all");
-    setSortConfig({ key: "totalEarning", direction: "desc" });
+    setSortConfig({ key: "totalAssignPaper", direction: "desc" });
   };
 
   const handleCreate = (teacherInput) => {
@@ -153,8 +135,7 @@ export default function TeacherManagementPage() {
             Teacher accounts
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-            Manage teacher accounts, exam permissions, earnings, withdrawals,
-            and assessment activity.
+            Manage teacher accounts and paper assignment activity.
           </p>
         </div>
 
@@ -181,20 +162,13 @@ export default function TeacherManagementPage() {
             </div>
           </div>
 
-          <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(18rem,1fr)_16rem_auto] lg:items-end">
+          <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(18rem,1fr)_auto] lg:items-end">
             <CustomSearch
               placeholder="Search by name, phone, or email..."
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
               ariaLabel="Search teachers"
               wide
-            />
-            <CustomDropdown
-              label="Permission"
-              options={permissionOptions}
-              value={permissionFilter}
-              onChange={(option) => setPermissionFilter(option.value)}
-              placeholder="All permissions"
             />
             <button
               type="button"
@@ -213,7 +187,6 @@ export default function TeacherManagementPage() {
               <tr>
                 <TableTh>Serial</TableTh>
                 <TableTh>Phone</TableTh>
-                <TableTh>Permission</TableTh>
                 {sortableColumns.map((column) => (
                   <TableTh key={column.key} className="text-right">
                     <SortableHeader
@@ -244,20 +217,11 @@ export default function TeacherManagementPage() {
                         </p>
                       </div>
                     </TableTd>
-                    <TableTd>
-                      <PermissionTags permissions={teacher.permissions} />
-                    </TableTd>
-                    <TableTd className="whitespace-nowrap text-right font-semibold text-foreground">
-                      {formatCurrency(teacher.totalWithdrawal)}
-                    </TableTd>
-                    <TableTd className="whitespace-nowrap text-right font-semibold text-foreground">
-                      {formatCurrency(teacher.totalEarning)}
-                    </TableTd>
-                    <TableTd className="whitespace-nowrap text-right font-semibold text-foreground">
-                      {formatCurrency(teacher.pendingWithdrawal)}
+                    <TableTd className="text-right font-semibold text-foreground">
+                      {teacher.totalAssignPaper ?? 0}
                     </TableTd>
                     <TableTd className="text-right font-semibold text-foreground">
-                      {teacher.totalAssessment}
+                      {teacher.totalSubmittedPaper ?? 0}
                     </TableTd>
                     <TableTd>
                       <TeacherActionMenu
@@ -269,7 +233,7 @@ export default function TeacherManagementPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableTd colSpan={8} className="py-12 text-center">
+                  <TableTd colSpan={5} className="py-12 text-center">
                     <p className="font-semibold text-foreground">
                       No teachers found
                     </p>

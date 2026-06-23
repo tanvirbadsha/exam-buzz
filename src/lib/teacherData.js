@@ -24,6 +24,8 @@ export const DEFAULT_TEACHERS = [
     totalEarning: 148000,
     pendingWithdrawal: 12000,
     totalAssessment: 86,
+    totalAssignPaper: 124,
+    totalSubmittedPaper: 109,
     createdAt: "2026-06-21T00:00:00.000Z",
   },
   {
@@ -38,6 +40,8 @@ export const DEFAULT_TEACHERS = [
     totalEarning: 99000,
     pendingWithdrawal: 7500,
     totalAssessment: 63,
+    totalAssignPaper: 91,
+    totalSubmittedPaper: 84,
     createdAt: "2026-06-21T00:00:00.000Z",
   },
   {
@@ -52,6 +56,8 @@ export const DEFAULT_TEACHERS = [
     totalEarning: 175500,
     pendingWithdrawal: 5200,
     totalAssessment: 104,
+    totalAssignPaper: 152,
+    totalSubmittedPaper: 137,
     createdAt: "2026-06-21T00:00:00.000Z",
   },
   {
@@ -66,6 +72,8 @@ export const DEFAULT_TEACHERS = [
     totalEarning: 72000,
     pendingWithdrawal: 14000,
     totalAssessment: 42,
+    totalAssignPaper: 68,
+    totalSubmittedPaper: 59,
     createdAt: "2026-06-21T00:00:00.000Z",
   },
 ];

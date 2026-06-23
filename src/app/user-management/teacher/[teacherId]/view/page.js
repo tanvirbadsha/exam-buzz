@@ -3,7 +3,6 @@
 import { PermissionTags } from "@/features/users/teacher/PermissionTags";
 import { TeacherNotFound } from "@/features/users/teacher/TeacherNotFound";
 import { useTeacherManagement } from "@/hooks/useTeacherManagement";
-import { formatCurrency } from "@/lib/teacherData";
 import { ArrowLeft, Pencil } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -55,8 +54,7 @@ export default function ViewTeacherPage() {
             Teacher details
           </h1>
           <p className="mt-2 text-sm text-muted">
-            Review teacher contact, permissions, earnings, and assessment
-            activity.
+            Review teacher contact, permissions, and paper activity.
           </p>
         </div>
         <Link
@@ -100,20 +98,12 @@ export default function ViewTeacherPage() {
               </div>
             </div>
             <MetricCard
-              label="Total withdrawal"
-              value={formatCurrency(teacher.totalWithdrawal)}
+              label="Total assign paper"
+              value={teacher.totalAssignPaper ?? 0}
             />
             <MetricCard
-              label="Total earning"
-              value={formatCurrency(teacher.totalEarning)}
-            />
-            <MetricCard
-              label="Pending withdrawal"
-              value={formatCurrency(teacher.pendingWithdrawal)}
-            />
-            <MetricCard
-              label="Total assesment"
-              value={teacher.totalAssessment}
+              label="Total submitted paper"
+              value={teacher.totalSubmittedPaper ?? 0}
             />
           </aside>
         </div>

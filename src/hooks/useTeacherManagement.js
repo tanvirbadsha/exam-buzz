@@ -99,6 +99,8 @@ function createFinancialSnapshot() {
     totalEarning: 0,
     pendingWithdrawal: 0,
     totalAssessment: 0,
+    totalAssignPaper: 0,
+    totalSubmittedPaper: 0,
   };
 }
 
