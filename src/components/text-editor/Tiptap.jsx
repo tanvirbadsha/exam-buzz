@@ -9,6 +9,7 @@ import Link from "@tiptap/extension-link";
 import TextAlign from "@tiptap/extension-text-align";
 import { FontSize, TextStyle } from "@tiptap/extension-text-style";
 import Underline from "@tiptap/extension-underline";
+import { Mark, mergeAttributes } from "@tiptap/core";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import {
@@ -27,6 +28,9 @@ import {
   Palette,
   Pilcrow,
   Redo2,
+  Sigma,
+  Subscript,
+  Superscript,
   Type,
   Underline as UnderlineIcon,
   Undo2,
@@ -55,6 +59,123 @@ const fontSizeOptions = [
 const swatches = ["#172033", "#262262", "#0f766e", "#b91c1c", "#c2410c"];
 const highlightSwatches = ["#ffffff", "#fef3c7", "#dcfce7", "#dbeafe", "#fee2e2"];
 
+const SuperscriptMark = Mark.create({
+  name: "superscript",
+
+  parseHTML() {
+    return [{ tag: "sup" }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ["sup", mergeAttributes(HTMLAttributes), 0];
+  },
+
+  addCommands() {
+    return {
+      toggleSuperscript:
+        () =>
+        ({ commands }) =>
+          commands.toggleMark(this.name),
+    };
+  },
+});
+
+const SubscriptMark = Mark.create({
+  name: "subscript",
+
+  parseHTML() {
+    return [{ tag: "sub" }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ["sub", mergeAttributes(HTMLAttributes), 0];
+  },
+
+  addCommands() {
+    return {
+      toggleSubscript:
+        () =>
+        ({ commands }) =>
+          commands.toggleMark(this.name),
+    };
+  },
+});
+
+function escapeHtml(value) {
+  return String(value).replace(/[<>&"]/g, (character) => {
+    const entities = {
+      "<": "&lt;",
+      ">": "&gt;",
+      "&": "&amp;",
+      '"': "&quot;",
+    };
+    return entities[character];
+  });
+}
+
+function equationTextToHtml(value) {
+  const escapedValue = escapeHtml(value);
+
+  return escapedValue
+    .replace(/\^\{([^}]+)\}/g, "<sup>$1</sup>")
+    .replace(/_\{([^}]+)\}/g, "<sub>$1</sub>")
+    .replace(/\^([A-Za-z0-9+\-]+)/g, "<sup>$1</sup>")
+    .replace(/_([A-Za-z0-9+\-]+)/g, "<sub>$1</sub>");
+}
+
+function getCurrentTextAlign(editor) {
+  return (
+    editor.getAttributes("listItem").textAlign ||
+    editor.getAttributes("paragraph").textAlign ||
+    editor.getAttributes("heading").textAlign ||
+    "left"
+  );
+}
+
+function applyListItemAlignment(editor, textAlign) {
+  const { state, view } = editor;
+  const listItemType = state.schema.nodes.listItem;
+  if (!listItemType) return false;
+
+  const { from, to } = state.selection;
+  const transaction = state.tr;
+  const listItemPositions = new Set();
+
+  const collectListItemAncestors = (resolvedPosition) => {
+    for (let depth = resolvedPosition.depth; depth > 0; depth -= 1) {
+      if (resolvedPosition.node(depth).type === listItemType) {
+        listItemPositions.add(resolvedPosition.before(depth));
+      }
+    }
+  };
+
+  collectListItemAncestors(state.selection.$from);
+  collectListItemAncestors(state.selection.$to);
+
+  state.doc.nodesBetween(from, to, (node, position) => {
+    if (node.type === listItemType) {
+      listItemPositions.add(position);
+    }
+  });
+
+  listItemPositions.forEach((position) => {
+    const node = state.doc.nodeAt(position);
+    if (!node || node.type !== listItemType) return;
+
+    const attrs = {
+      ...node.attrs,
+      textAlign: textAlign === "left" ? null : textAlign,
+    };
+
+    transaction.setNodeMarkup(position, undefined, attrs, node.marks);
+  });
+
+  if (!transaction.docChanged) return false;
+
+  view.dispatch(transaction);
+  return true;
+}
+
 function ToolbarButton({ active = false, disabled = false, icon: Icon, label, onClick }) {
   return (
     <button
@@ -63,6 +184,7 @@ function ToolbarButton({ active = false, disabled = false, icon: Icon, label, on
       aria-label={label}
       aria-pressed={active}
       disabled={disabled}
+      onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
       className={`icon-button h-8 w-8 border border-border ${
         active ? "bg-brand text-white hover:bg-brand hover:text-white" : "bg-white"
@@ -123,6 +245,8 @@ function TiptapToolbar({ editor }) {
       isBold: currentEditor.isActive("bold"),
       isItalic: currentEditor.isActive("italic"),
       isUnderline: currentEditor.isActive("underline"),
+      isSuperscript: currentEditor.isActive("superscript"),
+      isSubscript: currentEditor.isActive("subscript"),
       isBulletList: currentEditor.isActive("bulletList"),
       isOrderedList: currentEditor.isActive("orderedList"),
       isHeading1: currentEditor.isActive("heading", { level: 1 }),
@@ -168,6 +292,36 @@ function TiptapToolbar({ editor }) {
       }
     });
     reader.readAsDataURL(file);
+  };
+
+  const addEquation = () => {
+    const equation = window.prompt("Write equation", "x^2 + 2xy + 6");
+    if (!equation?.trim()) return;
+
+    editor
+      .chain()
+      .focus()
+      .insertContent(`<span>${equationTextToHtml(equation.trim())}</span>`)
+      .run();
+  };
+
+  const setAlignment = (textAlign) => {
+    editor.chain().focus().setTextAlign(textAlign).run();
+    applyListItemAlignment(editor, textAlign);
+  };
+
+  const toggleOrderedList = () => {
+    const textAlign = getCurrentTextAlign(editor);
+
+    editor.chain().focus().toggleOrderedList().run();
+    applyListItemAlignment(editor, textAlign);
+  };
+
+  const toggleBulletList = () => {
+    const textAlign = getCurrentTextAlign(editor);
+
+    editor.chain().focus().toggleBulletList().run();
+    applyListItemAlignment(editor, textAlign);
   };
 
   return (
@@ -249,6 +403,18 @@ function TiptapToolbar({ editor }) {
         active={editorState.isUnderline}
         onClick={() => editor.chain().focus().toggleUnderline().run()}
       />
+      <ToolbarButton
+        icon={Superscript}
+        label="Superscript"
+        active={editorState.isSuperscript}
+        onClick={() => editor.chain().focus().toggleMark("superscript").run()}
+      />
+      <ToolbarButton
+        icon={Subscript}
+        label="Subscript"
+        active={editorState.isSubscript}
+        onClick={() => editor.chain().focus().toggleMark("subscript").run()}
+      />
 
       <span className="h-6 w-px bg-border" aria-hidden="true" />
 
@@ -256,31 +422,31 @@ function TiptapToolbar({ editor }) {
         icon={AlignLeft}
         label="Align left"
         active={editorState.isAlignLeft}
-        onClick={() => editor.chain().focus().setTextAlign("left").run()}
+        onClick={() => setAlignment("left")}
       />
       <ToolbarButton
         icon={AlignCenter}
         label="Align center"
         active={editorState.isAlignCenter}
-        onClick={() => editor.chain().focus().setTextAlign("center").run()}
+        onClick={() => setAlignment("center")}
       />
       <ToolbarButton
         icon={AlignRight}
         label="Align right"
         active={editorState.isAlignRight}
-        onClick={() => editor.chain().focus().setTextAlign("right").run()}
+        onClick={() => setAlignment("right")}
       />
       <ToolbarButton
         icon={List}
         label="Bulleted list"
         active={editorState.isBulletList}
-        onClick={() => editor.chain().focus().toggleBulletList().run()}
+        onClick={toggleBulletList}
       />
       <ToolbarButton
         icon={ListOrdered}
         label="Numbered list"
         active={editorState.isOrderedList}
-        onClick={() => editor.chain().focus().toggleOrderedList().run()}
+        onClick={toggleOrderedList}
       />
 
       <span className="h-6 w-px bg-border" aria-hidden="true" />
@@ -307,6 +473,7 @@ function TiptapToolbar({ editor }) {
       <span className="h-6 w-px bg-border" aria-hidden="true" />
 
       <ToolbarButton icon={LinkIcon} label="Add link" onClick={addLink} />
+      <ToolbarButton icon={Sigma} label="Insert equation" onClick={addEquation} />
       <ToolbarButton icon={ImagePlus} label="Add image URL" onClick={addImageByUrl} />
       <ToolbarButton
         icon={Type}
@@ -350,13 +517,15 @@ export default function Tiptap({
       ListItem,
       ListKeymap,
       Underline,
+      SuperscriptMark,
+      SubscriptMark,
       TextStyle,
       FontSize,
       FontFamily,
       Color,
       Highlight.configure({ multicolor: true }),
       TextAlign.configure({
-        types: ["heading", "paragraph"],
+        types: ["heading", "paragraph", "listItem"],
       }),
       Link.configure({
         openOnClick: false,
