@@ -2,6 +2,7 @@
 
 import {
   BookOpenCheck,
+  BookOpenText,
   CalendarClock,
   ChevronDown,
   ChevronRight,
@@ -41,6 +42,11 @@ const menuItems = [
     label: "Categories",
     icon: FolderTree,
     href: "/categories",
+  },
+  {
+    label: "Subjects",
+    icon: BookOpenText,
+    href: "/subjects",
   },
   {
     label: "Courses",
