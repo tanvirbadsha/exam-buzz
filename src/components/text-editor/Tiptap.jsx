@@ -9,7 +9,10 @@ import Link from "@tiptap/extension-link";
 import TextAlign from "@tiptap/extension-text-align";
 import { FontSize, TextStyle } from "@tiptap/extension-text-style";
 import Underline from "@tiptap/extension-underline";
-import { Mark, mergeAttributes } from "@tiptap/core";
+import Mathematics, { migrateMathStrings } from "@tiptap/extension-mathematics";
+import { Extension, Mark, mergeAttributes } from "@tiptap/core";
+import { Fragment, Slice } from "@tiptap/pm/model";
+import { Plugin } from "@tiptap/pm/state";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import {
@@ -38,6 +41,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 const DEFAULT_CONTENT = "<p></p>";
+let activeMathEditor = null;
 
 const fontFamilyOptions = [
   { label: "Default", value: "" },
@@ -101,27 +105,114 @@ const SubscriptMark = Mark.create({
   },
 });
 
-function escapeHtml(value) {
-  return String(value).replace(/[<>&"]/g, (character) => {
-    const entities = {
-      "<": "&lt;",
-      ">": "&gt;",
-      "&": "&amp;",
-      '"': "&quot;",
-    };
-    return entities[character];
-  });
+function getMathSegments(text) {
+  const segments = [];
+  const pattern = /(\\\(([\s\S]*?)\\\)|\\\[([\s\S]*?)\\\]|\$\$([\s\S]*?)\$\$)/g;
+  let lastIndex = 0;
+  let hasDelimitedMath = false;
+  let match = pattern.exec(text);
+
+  while (match) {
+    hasDelimitedMath = true;
+
+    if (match.index > lastIndex) {
+      segments.push({ type: "text", value: text.slice(lastIndex, match.index) });
+    }
+
+    segments.push({
+      type: "math",
+      value: match[2] || match[3] || match[4] || "",
+    });
+
+    lastIndex = pattern.lastIndex;
+    match = pattern.exec(text);
+  }
+
+  if (lastIndex < text.length) {
+    segments.push({ type: "text", value: text.slice(lastIndex) });
+  }
+
+  if (
+    !hasDelimitedMath &&
+    /\\(frac|sqrt|pm|times|div|leq?|geq?|neq)\b/.test(text.trim())
+  ) {
+    return [{ type: "math", value: text.trim() }];
+  }
+
+  return segments;
 }
 
-function equationTextToHtml(value) {
-  const escapedValue = escapeHtml(value);
-
-  return escapedValue
-    .replace(/\^\{([^}]+)\}/g, "<sup>$1</sup>")
-    .replace(/_\{([^}]+)\}/g, "<sub>$1</sub>")
-    .replace(/\^([A-Za-z0-9+\-]+)/g, "<sup>$1</sup>")
-    .replace(/_([A-Za-z0-9+\-]+)/g, "<sub>$1</sub>");
+function normalizeLatexSource(source) {
+  return String(source || "")
+    .trim()
+    .replace(
+      /(?<![\\\w])(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)(?![\w])/g,
+      "\\frac{$1}{$2}",
+    );
 }
+
+function normalizeMathHtml(html) {
+  if (typeof window === "undefined" || !html?.includes("data-math-node")) {
+    return html;
+  }
+
+  const template = document.createElement("template");
+  template.innerHTML = html;
+
+  template.content
+    .querySelectorAll('[data-math-node="inline"][data-source]')
+    .forEach((element) => {
+      element.setAttribute("data-type", "inline-math");
+      element.setAttribute("data-latex", element.getAttribute("data-source") || "");
+      element.removeAttribute("data-math-node");
+      element.removeAttribute("data-source");
+      element.replaceChildren();
+    });
+
+  return template.innerHTML;
+}
+
+const MathPasteExtension = Extension.create({
+  name: "mathPasteExtension",
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        props: {
+          handlePaste: (view, event) => {
+            const text = event.clipboardData?.getData("text/plain") || "";
+            const segments = getMathSegments(text);
+            const hasMath = segments.some((segment) => segment.type === "math");
+
+            if (!hasMath) return false;
+
+            const nodes = segments
+              .map((segment) => {
+                if (segment.type === "math") {
+                  return view.state.schema.nodes.inlineMath.create({
+                    latex: normalizeLatexSource(segment.value),
+                  });
+                }
+
+                return segment.value ? view.state.schema.text(segment.value) : null;
+              })
+              .filter(Boolean);
+
+            if (nodes.length === 0) return false;
+
+            event.preventDefault();
+            view.dispatch(
+              view.state.tr
+                .replaceSelection(new Slice(Fragment.fromArray(nodes), 0, 0))
+                .scrollIntoView(),
+            );
+            return true;
+          },
+        },
+      }),
+    ];
+  },
+});
 
 function getCurrentTextAlign(editor) {
   return (
@@ -295,13 +386,15 @@ function TiptapToolbar({ editor }) {
   };
 
   const addEquation = () => {
-    const equation = window.prompt("Write equation", "x^2 + 2xy + 6");
-    if (!equation?.trim()) return;
+    const equation = normalizeLatexSource(
+      window.prompt("Write equation", "x^2 + 2xy + 6"),
+    );
+    if (!equation) return;
 
     editor
       .chain()
       .focus()
-      .insertContent(`<span>${equationTextToHtml(equation.trim())}</span>`)
+      .insertInlineMath({ latex: equation })
       .run();
   };
 
@@ -519,6 +612,48 @@ export default function Tiptap({
       Underline,
       SuperscriptMark,
       SubscriptMark,
+      Mathematics.configure({
+        katexOptions: {
+          throwOnError: false,
+        },
+        inlineOptions: {
+          onClick: (node, pos) => {
+            const currentEditor = activeMathEditor;
+            if (!currentEditor) return;
+
+            const nextLatex = normalizeLatexSource(
+              window.prompt("Edit equation:", node.attrs.latex),
+            );
+            if (!nextLatex) return;
+
+            currentEditor
+              .chain()
+              .setNodeSelection(pos)
+              .updateInlineMath({ latex: nextLatex, pos })
+              .focus()
+              .run();
+          },
+        },
+        blockOptions: {
+          onClick: (node, pos) => {
+            const currentEditor = activeMathEditor;
+            if (!currentEditor) return;
+
+            const nextLatex = normalizeLatexSource(
+              window.prompt("Edit equation:", node.attrs.latex),
+            );
+            if (!nextLatex) return;
+
+            currentEditor
+              .chain()
+              .setNodeSelection(pos)
+              .updateBlockMath({ latex: nextLatex, pos })
+              .focus()
+              .run();
+          },
+        },
+      }),
+      MathPasteExtension,
       TextStyle,
       FontSize,
       FontFamily,
@@ -555,7 +690,7 @@ export default function Tiptap({
 
   const editor = useEditor({
     extensions,
-    content: value || DEFAULT_CONTENT,
+    content: normalizeMathHtml(value || DEFAULT_CONTENT),
     immediatelyRender: false,
     shouldRerenderOnTransaction: false,
     editorProps: {
@@ -568,12 +703,25 @@ export default function Tiptap({
     onUpdate({ editor }) {
       emitChange(editor);
     },
+    onCreate({ editor }) {
+      migrateMathStrings(editor);
+    },
   });
+
+  useEffect(() => {
+    activeMathEditor = editor;
+
+    return () => {
+      if (activeMathEditor === editor) {
+        activeMathEditor = null;
+      }
+    };
+  }, [editor]);
 
   useEffect(() => {
     if (!editor) return;
 
-    const nextValue = value || DEFAULT_CONTENT;
+    const nextValue = normalizeMathHtml(value || DEFAULT_CONTENT);
     if (editor.getHTML() === nextValue) return;
 
     editor.commands.setContent(nextValue, { emitUpdate: false });
