@@ -63,6 +63,10 @@ const menuItems = [
         label: "Assign Package",
         href: "/package-management/assign-package",
       },
+      {
+        label: "Package Report",
+        href: "/package-management/package-report",
+      },
     ],
   },
   {

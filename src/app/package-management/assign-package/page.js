@@ -3,14 +3,11 @@ import { DEFAULT_PACKAGE_INFO } from "@/lib/packageInfoData";
 
 async function getAssignablePackages() {
   // Replace this mock with the assignable-package API when the endpoint is ready.
-  return DEFAULT_PACKAGE_INFO.filter(
-    (packageInfo) => packageInfo.status === "active",
-  );
+  return DEFAULT_PACKAGE_INFO;
 }
 
 export default async function AssignPackagePage() {
   const packages = await getAssignablePackages();
 
-  return <AssignPackageForm packages={packages} />;
+  return <AssignPackageForm initialPackages={packages} />;
 }
-
