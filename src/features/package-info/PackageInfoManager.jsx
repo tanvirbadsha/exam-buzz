@@ -2,25 +2,23 @@
 
 import {
   CalendarDays,
-  CheckCircle2,
   CircleDollarSign,
   ExternalLink,
-  FileText,
-  ListChecks,
   Layers3,
   PackagePlus,
   Pencil,
   Plus,
   RotateCcw,
   Search,
+  ShieldCheck,
   ShoppingBag,
   Trash2,
   Users,
 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { useDeferredValue, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { StatusToggle } from "@/components/ui/StatusToggle";
 import { CustomDropdown } from "@/components/ui/forms/CustomDropdown";
 import {
   PACKAGE_STATUS_OPTIONS,
@@ -31,34 +29,9 @@ import { PackageInfoModal } from "./PackageInfoModal";
 
 const statusBadgeClassNames = {
   active: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  draft: "border-amber-200 bg-amber-50 text-amber-700",
-  archived: "border-slate-200 bg-slate-100 text-slate-600",
+  inactive: "border-slate-200 bg-slate-100 text-slate-600",
+  upcoming: "border-amber-200 bg-amber-50 text-amber-700",
 };
-
-function getPermissionGroups(permissions) {
-  const groupMap = new Map();
-
-  permissions.forEach((permission, index) => {
-    const [area = "Access", type = "General"] = permission.path;
-    const key = `${area}-${type}`;
-    const existingGroup = groupMap.get(key);
-    const nextItem = { ...permission, index };
-
-    if (existingGroup) {
-      existingGroup.items.push(nextItem);
-      return;
-    }
-
-    groupMap.set(key, {
-      key,
-      area,
-      type,
-      items: [nextItem],
-    });
-  });
-
-  return Array.from(groupMap.values());
-}
 
 function PackageMetric({ icon: Icon, label, value }) {
   return (
@@ -72,45 +45,30 @@ function PackageMetric({ icon: Icon, label, value }) {
   );
 }
 
-function PackageCard({ packageInfo, onDelete, onEdit, onStatusChange }) {
-  const isActive = packageInfo.status === "active";
+function PackageCard({ packageInfo, onDelete, onEdit }) {
   const rulesHtml = packageInfo.rulesHtml;
-  const permissionGroups = useMemo(
-    () => getPermissionGroups(packageInfo.permissions),
-    [packageInfo.permissions],
-  );
 
   return (
     <article className="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
       <div className="grid min-h-[34rem] lg:grid-cols-[18rem_1fr]">
         <div className="flex flex-col justify-between bg-[#111827] p-5 text-white">
           <div>
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg bg-white">
-                {packageInfo.imageUrl ? (
-                  <Image
-                    src={packageInfo.imageUrl}
-                    alt=""
-                    width={64}
-                    height={64}
-                    unoptimized
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <PackagePlus size={26} className="text-brand" />
-                )}
-              </div>
-              <span
-                className={`rounded-full border px-2.5 py-1 text-xs font-bold capitalize ${
-                  statusBadgeClassNames[packageInfo.status] ||
-                  statusBadgeClassNames.archived
-                }`}
-              >
-                {packageInfo.status}
-              </span>
+            <div className="flex h-44 w-full items-center justify-center overflow-hidden rounded-lg bg-white">
+              {packageInfo.imageUrl ? (
+                <Image
+                  src={packageInfo.imageUrl}
+                  alt=""
+                  width={320}
+                  height={220}
+                  unoptimized
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <PackagePlus size={42} className="text-brand" />
+              )}
             </div>
 
-            <p className="mt-8 text-xs font-semibold uppercase tracking-[0.22em] text-brand-accent">
+            <p className="mt-6 text-xs font-semibold uppercase tracking-[0.22em] text-brand-accent">
               Package price
             </p>
             <div className="mt-2 flex items-end gap-2">
@@ -142,6 +100,14 @@ function PackageCard({ packageInfo, onDelete, onEdit, onStatusChange }) {
         <div className="flex min-w-0 flex-col p-5 sm:p-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="min-w-0">
+              <span
+                className={`mb-3 inline-flex rounded-full border px-2.5 py-1 text-xs font-bold capitalize ${
+                  statusBadgeClassNames[packageInfo.status] ||
+                  statusBadgeClassNames.inactive
+                }`}
+              >
+                {packageInfo.status}
+              </span>
               <h2 className="text-2xl font-black leading-tight text-foreground">
                 {packageInfo.title}
               </h2>
@@ -156,13 +122,13 @@ function PackageCard({ packageInfo, onDelete, onEdit, onStatusChange }) {
             </div>
 
             <div className="flex shrink-0 flex-wrap items-center gap-2">
-              <StatusToggle
-                checked={isActive}
-                label={`Set ${packageInfo.title} active status`}
-                onChange={(checked) =>
-                  onStatusChange(packageInfo, checked ? "active" : "draft")
-                }
-              />
+              <Link
+                href={`/package-management/packages/${packageInfo.id}/permissions`}
+                className="icon-button h-9 w-9 border border-border"
+                aria-label={`Manage permissions for ${packageInfo.title}`}
+              >
+                <ShieldCheck size={16} />
+              </Link>
               <button
                 type="button"
                 className="icon-button h-9 w-9 border border-border"
@@ -197,27 +163,9 @@ function PackageCard({ packageInfo, onDelete, onEdit, onStatusChange }) {
               )}
             />
             <PackageMetric
-              icon={FileText}
-              label="Rules"
-              value={`${packageInfo.rules.length} conditions`}
-            />
-          </div>
-
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <PackageMetric
-              icon={ListChecks}
-              label="Permissions"
-              value={`${packageInfo.permissions.length} entries`}
-            />
-            <PackageMetric
-              icon={CheckCircle2}
-              label="Access groups"
-              value={`${permissionGroups.length} groups`}
-            />
-            <PackageMetric
-              icon={Layers3}
-              label="Primary scope"
-              value={permissionGroups[0]?.area || "General"}
+              icon={CalendarDays}
+              label="Validity"
+              value={`${packageInfo.validityDays} days`}
             />
           </div>
 
@@ -233,7 +181,7 @@ function PackageCard({ packageInfo, onDelete, onEdit, onStatusChange }) {
             </a>
           )}
 
-          <div className="mt-6 grid flex-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,0.75fr)]">
+          <div className="mt-6 flex-1">
             <section>
               <div className="mb-3 flex items-center gap-2">
                 <CircleDollarSign size={17} className="text-brand-strong" />
@@ -262,64 +210,6 @@ function PackageCard({ packageInfo, onDelete, onEdit, onStatusChange }) {
                 </div>
               )}
             </section>
-
-            <section className="min-w-0">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 size={17} className="text-emerald-600" />
-                  <h3 className="text-sm font-bold text-foreground">
-                    Exams and access
-                  </h3>
-                </div>
-                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
-                  {packageInfo.permissions.length} permissions
-                </span>
-              </div>
-
-              <div className="max-h-[27rem] space-y-3 overflow-y-auto pr-1">
-                {permissionGroups.map((group) => (
-                  <div
-                    key={`${packageInfo.id}-${group.key}`}
-                    className="overflow-hidden rounded-lg border border-emerald-100 bg-emerald-50/60"
-                  >
-                    <div className="flex items-center justify-between gap-3 border-b border-emerald-100 bg-white/80 px-3 py-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-black text-foreground">
-                          {group.area} / {group.type}
-                        </p>
-                        <p className="text-xs font-semibold text-muted">
-                          {group.items.length} permitted item
-                          {group.items.length === 1 ? "" : "s"}
-                        </p>
-                      </div>
-                      <span className="rounded-md bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-700">
-                        {group.items.length}
-                      </span>
-                    </div>
-
-                    <div className="divide-y divide-emerald-100">
-                      {group.items.map((item) => {
-                        const detail = item.path.slice(2).join(" / ");
-
-                        return (
-                          <div
-                            key={`${packageInfo.id}-${group.key}-${item.index}`}
-                            className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2"
-                          >
-                            <p className="min-w-0 truncate text-sm font-semibold text-foreground">
-                              {detail || item.path.join(" / ")}
-                            </p>
-                            <span className="rounded-full bg-white px-2 py-1 text-xs font-bold text-emerald-700">
-                              {item.permission}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
           </div>
         </div>
       </div>
@@ -334,7 +224,6 @@ export function PackageInfoManager({ initialPackages }) {
     packages,
     totals,
     updatePackage,
-    updatePackageStatus,
   } = usePackageInfoManagement(initialPackages);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -415,14 +304,9 @@ export function PackageInfoManager({ initialPackages }) {
     toast.error("Package could not be deleted.");
   };
 
-  const handleStatusChange = (packageInfo, status) => {
-    const updatedPackage = updatePackageStatus(packageInfo.id, status);
-    toast.success(`${updatedPackage.title} marked ${status}.`);
-  };
-
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-end">
+      <section className="grid gap-5 xl:grid-cols-2 xl:items-end">
         <div>
           <p className="text-sm font-semibold text-brand-strong">
             Package Info
@@ -430,10 +314,6 @@ export function PackageInfoManager({ initialPackages }) {
           <h1 className="mt-1 text-2xl font-black text-foreground sm:text-3xl">
             Package rules, pricing and exam access
           </h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-            Review every commercial package in a single card: price, validity,
-            package conditions, allowed materials and included exams.
-          </p>
         </div>
 
         <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
@@ -444,15 +324,15 @@ export function PackageInfoManager({ initialPackages }) {
             </p>
           </div>
           <div className="border-r border-border px-4 py-3">
-            <p className="text-xs font-semibold text-muted">Students</p>
+            <p className="text-xs font-semibold text-muted">Inactive</p>
             <p className="mt-1 text-xl font-black text-foreground">
-              {totals.students}
+              {totals.inactive}
             </p>
           </div>
           <div className="px-4 py-3">
-            <p className="text-xs font-semibold text-muted">Revenue</p>
+            <p className="text-xs font-semibold text-muted">Upcoming</p>
             <p className="mt-1 text-xl font-black text-foreground">
-              {formatPackageCurrency(totals.revenue)}
+              {totals.upcoming}
             </p>
           </div>
         </div>
@@ -510,7 +390,6 @@ export function PackageInfoManager({ initialPackages }) {
               packageInfo={packageInfo}
               onDelete={handleDelete}
               onEdit={openEditModal}
-              onStatusChange={handleStatusChange}
             />
           ))
         ) : (

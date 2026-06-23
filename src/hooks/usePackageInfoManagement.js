@@ -5,6 +5,7 @@ import {
   PACKAGE_INFO_STORAGE_KEY,
   createPackageId,
   htmlToPackageRuleLines,
+  normalizePackageStatus,
   packageRulesToHtml,
 } from "@/lib/packageInfoData";
 
@@ -23,7 +24,12 @@ function parsePackageList(storedValue) {
 }
 
 function mergeWithInitialPackages(storedPackages, initialPackages) {
-  if (!storedPackages) return initialPackages;
+  if (!storedPackages) {
+    return initialPackages.map((packageInfo) => ({
+      ...packageInfo,
+      status: normalizePackageStatus(packageInfo.status),
+    }));
+  }
 
   const storedPackageIds = new Set(
     storedPackages.map((packageInfo) => packageInfo.id),
@@ -32,7 +38,10 @@ function mergeWithInitialPackages(storedPackages, initialPackages) {
     (packageInfo) => !storedPackageIds.has(packageInfo.id),
   );
 
-  return [...missingInitialPackages, ...storedPackages];
+  return [...missingInitialPackages, ...storedPackages].map((packageInfo) => ({
+    ...packageInfo,
+    status: normalizePackageStatus(packageInfo.status),
+  }));
 }
 
 function readPackageSnapshot(initialPackages) {
@@ -41,7 +50,7 @@ function readPackageSnapshot(initialPackages) {
   const storedValue = window.localStorage.getItem(PACKAGE_INFO_STORAGE_KEY);
   if (!storedValue) {
     cachedRawPackages = null;
-    cachedPackages = initialPackages;
+    cachedPackages = mergeWithInitialPackages(null, initialPackages);
     return cachedPackages;
   }
 
@@ -130,7 +139,7 @@ function normalizePackage(packageInput, currentPackage = {}) {
         : parsePositiveNumber(packageInput.discountPrice),
     currency: packageInput.currency?.trim() || "BDT",
     validityDays: Math.floor(parsePositiveNumber(packageInput.validityDays)),
-    status: packageInput.status || "draft",
+    status: normalizePackageStatus(packageInput.status),
     packageType: packageInput.packageType || currentPackage.packageType || "Course Base",
     packageTypeNote:
       packageInput.packageTypeNote?.trim() || currentPackage.packageTypeNote || "",
@@ -220,7 +229,29 @@ export function usePackageInfoManagement(initialPackages) {
       const nextPackages = packages.map((packageInfo) => {
         if (packageInfo.id !== packageId) return packageInfo;
 
-        updatedPackage = { ...packageInfo, status };
+        updatedPackage = {
+          ...packageInfo,
+          status: normalizePackageStatus(status),
+        };
+        return updatedPackage;
+      });
+
+      persistPackages(nextPackages);
+      return updatedPackage;
+    },
+    [packages, persistPackages],
+  );
+
+  const updatePackagePermissions = useCallback(
+    (packageId, permissions) => {
+      let updatedPackage = null;
+      const nextPackages = packages.map((packageInfo) => {
+        if (packageInfo.id !== packageId) return packageInfo;
+
+        updatedPackage = {
+          ...packageInfo,
+          permissions: normalizePermissions(permissions),
+        };
         return updatedPackage;
       });
 
@@ -235,10 +266,12 @@ export function usePackageInfoManagement(initialPackages) {
       packages.reduce(
         (summary, packageInfo) => ({
           active: summary.active + (packageInfo.status === "active" ? 1 : 0),
-          students: summary.students + Number(packageInfo.totalPurchased || 0),
-          revenue: summary.revenue + Number(packageInfo.totalSellAmount || 0),
+          inactive:
+            summary.inactive + (packageInfo.status === "inactive" ? 1 : 0),
+          upcoming:
+            summary.upcoming + (packageInfo.status === "upcoming" ? 1 : 0),
         }),
-        { active: 0, students: 0, revenue: 0 },
+        { active: 0, inactive: 0, upcoming: 0 },
       ),
     [packages],
   );
@@ -249,6 +282,7 @@ export function usePackageInfoManagement(initialPackages) {
     packages,
     totals,
     updatePackage,
+    updatePackagePermissions,
     updatePackageStatus,
   };
 }

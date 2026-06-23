@@ -3,8 +3,8 @@ export const PACKAGE_INFO_STORAGE_KEY = "exam-buzz-package-info";
 export const PACKAGE_STATUS_OPTIONS = [
   { label: "All statuses", value: "all" },
   { label: "Active", value: "active" },
-  { label: "Draft", value: "draft" },
-  { label: "Archived", value: "archived" },
+  { label: "Inactive", value: "inactive" },
+  { label: "Upcoming", value: "upcoming" },
 ];
 
 export const PACKAGE_TYPE_OPTIONS = [
@@ -150,7 +150,7 @@ export const DEFAULT_PACKAGE_INFO = [
     price: 699,
     currency: "BDT",
     validityDays: 45,
-    status: "draft",
+    status: "upcoming",
     packageType: "Exam Limited",
     packageTypeNote: "Limited exam access with revision sheets",
     totalPurchased: 0,
@@ -175,6 +175,17 @@ export function createPackageId() {
   return `pkg-${Date.now().toString(36)}-${Math.random()
     .toString(36)
     .slice(2, 7)}`;
+}
+
+export function normalizePackageStatus(status) {
+  if (status === "active" || status === "inactive" || status === "upcoming") {
+    return status;
+  }
+
+  if (status === "draft") return "upcoming";
+  if (status === "archived") return "inactive";
+
+  return "inactive";
 }
 
 export function formatPackageCurrency(amount, currency = "BDT") {
