@@ -6,6 +6,17 @@ export const STUDENT_STATUS_OPTIONS = [
   { label: "Inactive", value: "inactive" },
 ];
 
+export const STUDENT_ACCOUNT_STATUS_OPTIONS = [
+  { label: "Active", value: "active" },
+  { label: "Inactive", value: "inactive" },
+];
+
+export const STUDENT_GENDER_OPTIONS = [
+  { label: "Male", value: "male" },
+  { label: "Female", value: "female" },
+  { label: "Other", value: "other" },
+];
+
 export const STUDENT_PACKAGE_OPTIONS = [
   { label: "All packages", value: "all" },
   { label: "BCS Complete", value: "BCS Complete" },
@@ -20,7 +31,9 @@ export const DEFAULT_STUDENTS = [
     id: "student-sabbir",
     name: "Sabbir Ahmed",
     userId: "USR-1001",
+    gender: "male",
     phone: "+880 1710-123456",
+    password: "123456",
     registrationId: "REG-2026-001",
     purchasedPackage: "BCS Complete",
     purchasedPackageCount: 3,
@@ -36,7 +49,9 @@ export const DEFAULT_STUDENTS = [
     id: "student-farhana",
     name: "Farhana Akter",
     userId: "USR-1002",
+    gender: "female",
     phone: "+880 1811-234567",
+    password: "123456",
     registrationId: "REG-2026-002",
     purchasedPackage: "Bank Job Pro",
     purchasedPackageCount: 2,
@@ -52,7 +67,9 @@ export const DEFAULT_STUDENTS = [
     id: "student-nayeem",
     name: "Nayeem Hasan",
     userId: "USR-1003",
+    gender: "male",
     phone: "+880 1912-345678",
+    password: "123456",
     registrationId: "REG-2026-003",
     purchasedPackage: "Primary Teacher",
     purchasedPackageCount: 1,
@@ -68,7 +85,9 @@ export const DEFAULT_STUDENTS = [
     id: "student-tasnim",
     name: "Tasnim Jahan",
     userId: "USR-1004",
+    gender: "female",
     phone: "+880 1613-456789",
+    password: "123456",
     registrationId: "REG-2026-004",
     purchasedPackage: "NTRCA Master",
     purchasedPackageCount: 4,
@@ -84,7 +103,9 @@ export const DEFAULT_STUDENTS = [
     id: "student-rakib",
     name: "Rakibul Islam",
     userId: "USR-1005",
+    gender: "male",
     phone: "+880 1514-567890",
+    password: "123456",
     registrationId: "REG-2026-005",
     purchasedPackage: "HSC Science",
     purchasedPackageCount: 2,

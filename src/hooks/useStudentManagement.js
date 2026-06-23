@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import {
   DEFAULT_STUDENTS,
+  STUDENT_GENDER_OPTIONS,
   STUDENT_PACKAGE_OPTIONS,
   STUDENT_STORAGE_KEY,
   createRegistrationId,
@@ -92,6 +93,21 @@ function normalizePackage(packageName) {
   return validPackages.has(packageName) ? packageName : "BCS Complete";
 }
 
+function normalizeGender(gender) {
+  const allowedGenders = new Set(
+    STUDENT_GENDER_OPTIONS.map((option) => option.value),
+  );
+
+  return allowedGenders.has(gender) ? gender : "male";
+}
+
+function normalizeActiveStatus(status, fallback = true) {
+  if (status === "active") return true;
+  if (status === "inactive") return false;
+  if (status === undefined || status === null || status === "") return fallback;
+  return Boolean(status);
+}
+
 function parseCount(value) {
   const parsedValue = Number(value);
   if (!Number.isFinite(parsedValue) || parsedValue < 0) return 0;
@@ -127,7 +143,9 @@ export function useStudentManagement() {
         id: createStudentId(),
         name: studentInput.name.trim(),
         userId: studentInput.userId?.trim() || createUserId(),
+        gender: normalizeGender(studentInput.gender),
         phone: studentInput.phone.trim(),
+        password: studentInput.password || "",
         registrationId:
           studentInput.registrationId?.trim() || createRegistrationId(),
         purchasedPackage: normalizePackage(studentInput.purchasedPackage),
@@ -135,7 +153,7 @@ export function useStudentManagement() {
         purchaseAmount: parseAmount(studentInput.purchaseAmount),
         preliminaryExam: parseCount(studentInput.preliminaryExam),
         writtenExam: parseCount(studentInput.writtenExam),
-        isActive: Boolean(studentInput.isActive),
+        isActive: normalizeActiveStatus(studentInput.isActive, true),
         email: studentInput.email?.trim() || "",
         address: studentInput.address?.trim() || "",
         createdAt: new Date().toISOString(),
@@ -155,17 +173,28 @@ export function useStudentManagement() {
         return {
           ...student,
           name: studentInput.name.trim(),
-          userId: studentInput.userId.trim(),
+          userId: studentInput.userId?.trim() || student.userId,
+          gender: normalizeGender(studentInput.gender ?? student.gender),
           phone: studentInput.phone.trim(),
-          registrationId: studentInput.registrationId.trim(),
-          purchasedPackage: normalizePackage(studentInput.purchasedPackage),
-          purchasedPackageCount: parseCount(studentInput.purchasedPackageCount),
-          purchaseAmount: parseAmount(studentInput.purchaseAmount),
-          preliminaryExam: parseCount(studentInput.preliminaryExam),
-          writtenExam: parseCount(studentInput.writtenExam),
-          isActive: Boolean(studentInput.isActive),
+          password: studentInput.password ?? student.password ?? "",
+          registrationId:
+            studentInput.registrationId?.trim() || student.registrationId,
+          purchasedPackage: normalizePackage(
+            studentInput.purchasedPackage ?? student.purchasedPackage,
+          ),
+          purchasedPackageCount: parseCount(
+            studentInput.purchasedPackageCount ?? student.purchasedPackageCount,
+          ),
+          purchaseAmount: parseAmount(
+            studentInput.purchaseAmount ?? student.purchaseAmount,
+          ),
+          preliminaryExam: parseCount(
+            studentInput.preliminaryExam ?? student.preliminaryExam,
+          ),
+          writtenExam: parseCount(studentInput.writtenExam ?? student.writtenExam),
+          isActive: normalizeActiveStatus(studentInput.isActive, student.isActive),
           email: studentInput.email?.trim() || "",
-          address: studentInput.address?.trim() || "",
+          address: studentInput.address?.trim() || student.address || "",
         };
       });
 

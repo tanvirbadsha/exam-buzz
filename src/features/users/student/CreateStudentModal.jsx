@@ -43,7 +43,7 @@ export function CreateStudentModal({ isOpen, onClose, onCreate }) {
               Create student
             </h2>
             <p className="mt-1 text-sm text-muted">
-              Add a student account and package summary.
+              Add a student account with contact and login details.
             </p>
           </div>
           <button

@@ -2,36 +2,43 @@
 
 import {
   AtSign,
-  BadgeCheck,
-  Hash,
-  MapPin,
-  Package,
+  CheckCircle2,
+  LockKeyhole,
   Phone,
   UserRound,
+  UsersRound,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { CustomDropdown } from "@/components/ui/forms/CustomDropdown";
 import { TextInput } from "@/components/ui/forms/TextInput";
-import { STUDENT_PACKAGE_OPTIONS } from "@/lib/studentData";
-
-const packageOptions = STUDENT_PACKAGE_OPTIONS.filter(
-  (option) => option.value !== "all",
-);
+import {
+  STUDENT_ACCOUNT_STATUS_OPTIONS,
+  STUDENT_GENDER_OPTIONS,
+} from "@/lib/studentData";
 
 const emptyStudent = {
   name: "",
-  userId: "",
+  gender: "male",
   phone: "",
-  registrationId: "",
-  purchasedPackage: "BCS Complete",
-  purchasedPackageCount: 1,
-  purchaseAmount: 0,
-  preliminaryExam: 0,
-  writtenExam: 0,
-  isActive: true,
   email: "",
-  address: "",
+  password: "",
+  isActive: "active",
 };
+
+function getInitialStudent(student) {
+  return {
+    ...emptyStudent,
+    ...student,
+    gender: student?.gender || emptyStudent.gender,
+    isActive:
+      typeof student?.isActive === "boolean"
+        ? student.isActive
+          ? "active"
+          : "inactive"
+        : student?.isActive || emptyStudent.isActive,
+    password: student?.password || "",
+  };
+}
 
 function buildErrors(form) {
   const errors = {};
@@ -40,33 +47,29 @@ function buildErrors(form) {
     errors.name = { message: "Name is required." };
   }
 
+  if (!form.gender) {
+    errors.gender = { message: "Gender is required." };
+  }
+
   if (!form.phone.trim()) {
     errors.phone = { message: "Phone is required." };
   }
 
-  if (!form.userId.trim()) {
-    errors.userId = { message: "User ID is required." };
-  }
-
-  if (!form.registrationId.trim()) {
-    errors.registrationId = { message: "Registration ID is required." };
-  }
-
-  if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+  if (!form.email.trim()) {
+    errors.email = { message: "Email is required." };
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
     errors.email = { message: "Enter a valid email address." };
   }
 
-  [
-    ["purchasedPackageCount", "Purchased package"],
-    ["purchaseAmount", "Purchase amount"],
-    ["preliminaryExam", "Preliminary exam"],
-    ["writtenExam", "Written exam"],
-  ].forEach(([field, label]) => {
-    const value = Number(form[field]);
-    if (!Number.isFinite(value) || value < 0) {
-      errors[field] = { message: `${label} must be 0 or more.` };
-    }
-  });
+  if (!form.password) {
+    errors.password = { message: "Password is required." };
+  } else if (form.password.length < 6) {
+    errors.password = { message: "Password must be at least 6 characters." };
+  }
+
+  if (!form.isActive) {
+    errors.isActive = { message: "Status is required." };
+  }
 
   return errors;
 }
@@ -77,10 +80,7 @@ export function StudentForm({
   submitLabel = "Save student",
   secondaryAction,
 }) {
-  const initialForm = useMemo(
-    () => ({ ...emptyStudent, ...student }),
-    [student],
-  );
+  const initialForm = useMemo(() => getInitialStudent(student), [student]);
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
 
@@ -101,7 +101,12 @@ export function StudentForm({
 
     if (Object.keys(nextErrors).length > 0) return;
 
-    onSubmit(form);
+    onSubmit({
+      ...form,
+      name: form.name.trim(),
+      phone: form.phone.trim(),
+      email: form.email.trim(),
+    });
   };
 
   return (
@@ -116,14 +121,14 @@ export function StudentForm({
           error={errors.name}
           placeholder="Student name"
         />
-        <TextInput
-          label="User ID"
-          name="userId"
-          icon={Hash}
-          value={form.userId}
-          onChange={(event) => updateField("userId", event.target.value)}
-          error={errors.userId}
-          placeholder="USR-1006"
+        <CustomDropdown
+          label="Gender"
+          icon={UsersRound}
+          options={STUDENT_GENDER_OPTIONS}
+          value={form.gender}
+          onChange={(option) => updateField("gender", option.value)}
+          error={errors.gender}
+          placeholder="Select gender"
         />
         <TextInput
           label="Phone"
@@ -135,71 +140,6 @@ export function StudentForm({
           placeholder="+880 1XXX-XXXXXX"
         />
         <TextInput
-          label="Registration ID"
-          name="registrationId"
-          icon={BadgeCheck}
-          value={form.registrationId}
-          onChange={(event) =>
-            updateField("registrationId", event.target.value)
-          }
-          error={errors.registrationId}
-          placeholder="REG-2026-006"
-        />
-        <CustomDropdown
-          label="Purchased Package"
-          icon={Package}
-          options={packageOptions}
-          value={form.purchasedPackage}
-          onChange={(option) => updateField("purchasedPackage", option.value)}
-          placeholder="Select package"
-        />
-        <TextInput
-          label="Purchase Amount"
-          name="purchaseAmount"
-          type="number"
-          min="0"
-          value={form.purchaseAmount}
-          onChange={(event) =>
-            updateField("purchaseAmount", event.target.value)
-          }
-          error={errors.purchaseAmount}
-          placeholder="0"
-        />
-        <TextInput
-          label="Purchased Package Count"
-          name="purchasedPackageCount"
-          type="number"
-          min="0"
-          value={form.purchasedPackageCount}
-          onChange={(event) =>
-            updateField("purchasedPackageCount", event.target.value)
-          }
-          error={errors.purchasedPackageCount}
-          placeholder="0"
-        />
-        <TextInput
-          label="Preliminary Exam"
-          name="preliminaryExam"
-          type="number"
-          min="0"
-          value={form.preliminaryExam}
-          onChange={(event) =>
-            updateField("preliminaryExam", event.target.value)
-          }
-          error={errors.preliminaryExam}
-          placeholder="0"
-        />
-        <TextInput
-          label="Written Exam"
-          name="writtenExam"
-          type="number"
-          min="0"
-          value={form.writtenExam}
-          onChange={(event) => updateField("writtenExam", event.target.value)}
-          error={errors.writtenExam}
-          placeholder="0"
-        />
-        <TextInput
           label="Email"
           name="email"
           type="email"
@@ -209,34 +149,26 @@ export function StudentForm({
           error={errors.email}
           placeholder="student@example.com"
         />
-        <div className="md:col-span-2">
-          <TextInput
-            label="Address"
-            name="address"
-            icon={MapPin}
-            value={form.address}
-            onChange={(event) => updateField("address", event.target.value)}
-            placeholder="City, country"
-          />
-        </div>
-      </div>
-
-      <label className="flex items-center gap-3 rounded-lg border border-border bg-surface-muted px-4 py-3">
-        <input
-          type="checkbox"
-          checked={form.isActive}
-          onChange={(event) => updateField("isActive", event.target.checked)}
-          className="h-4 w-4 accent-brand"
+        <TextInput
+          label="Password"
+          name="password"
+          type="password"
+          icon={LockKeyhole}
+          value={form.password}
+          onChange={(event) => updateField("password", event.target.value)}
+          error={errors.password}
+          placeholder="Minimum 6 characters"
         />
-        <span>
-          <span className="block text-sm font-semibold text-foreground">
-            Active student
-          </span>
-          <span className="block text-xs text-muted">
-            Active students can access purchased packages.
-          </span>
-        </span>
-      </label>
+        <CustomDropdown
+          label="Status"
+          icon={CheckCircle2}
+          options={STUDENT_ACCOUNT_STATUS_OPTIONS}
+          value={form.isActive}
+          onChange={(option) => updateField("isActive", option.value)}
+          error={errors.isActive}
+          placeholder="Select status"
+        />
+      </div>
 
       <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end">
         {secondaryAction}
