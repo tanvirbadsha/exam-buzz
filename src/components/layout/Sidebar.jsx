@@ -6,6 +6,7 @@ import {
   CalendarClock,
   ChevronDown,
   ChevronRight,
+  FileText,
   FolderTree,
   GraduationCap,
   LayoutDashboard,
@@ -48,6 +49,11 @@ const menuItems = [
     label: "Subjects",
     icon: BookOpenText,
     href: "/subjects",
+  },
+  {
+    label: "Materials",
+    icon: FileText,
+    href: "/materials",
   },
   {
     label: "Courses",

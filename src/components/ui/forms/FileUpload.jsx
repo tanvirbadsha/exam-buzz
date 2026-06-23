@@ -70,6 +70,11 @@ export const FileUpload = forwardRef(
     };
 
     useEffect(() => {
+      setPreview(existingUrl || null);
+      setFileName(existingFileName || (existingUrl ? "Existing Document" : ""));
+    }, [existingFileName, existingUrl]);
+
+    useEffect(() => {
       return () => {
         // CRITICAL FIX: Only revoke temporary local blob URLs.
         // Do not attempt to revoke standard https:// URLs or the string "document".
@@ -79,8 +84,10 @@ export const FileUpload = forwardRef(
       };
     }, [preview]);
 
-    // Check if the preview is a PDF link from the server
-    const isServerPdf = preview && preview.includes(".pdf");
+    const isPdfPreview =
+      preview &&
+      (preview.includes(".pdf") || preview.startsWith("data:application/pdf"));
+    const isDocumentPreview = preview === "document" || isPdfPreview;
 
     return (
       <div className="field-group">
@@ -122,7 +129,7 @@ export const FileUpload = forwardRef(
           ) : (
             <div className="relative z-10 flex w-full items-center justify-between rounded-lg border border-border bg-surface p-3 shadow-sm">
               <div className="flex items-center gap-3 overflow-hidden">
-                {preview === "document" || isServerPdf ? (
+                {isDocumentPreview ? (
                   <div className="shrink-0 rounded-lg bg-blue-50 p-2 text-blue-600">
                     <FileText size={20} />
                   </div>
@@ -137,7 +144,7 @@ export const FileUpload = forwardRef(
                   />
                 )}
 
-                {isServerPdf ? (
+                {isPdfPreview && preview !== "document" ? (
                   <a
                     href={preview}
                     target="_blank"
