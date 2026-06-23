@@ -55,8 +55,8 @@ export const FileUpload = forwardRef(
       e.preventDefault();
       e.stopPropagation();
 
-      // If they are deleting the server-provided file, notify the parent form
-      if (existingUrl && preview === existingUrl && onRemoveExisting) {
+      // Notify the parent form so persisted URLs and newly selected files clear together.
+      if (onRemoveExisting) {
         onRemoveExisting();
       }
 

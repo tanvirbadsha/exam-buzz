@@ -114,25 +114,41 @@ function normalizePermissions(value) {
 
 function normalizePackage(packageInput, currentPackage = {}) {
   const rulesHtml = packageInput.rulesHtml || packageRulesToHtml(packageInput.rules);
+  const permissions =
+    packageInput.permissions === undefined
+      ? currentPackage.permissions || []
+      : normalizePermissions(packageInput.permissions);
 
   return {
     ...currentPackage,
     id: currentPackage.id || createPackageId(),
     title: packageInput.title.trim(),
     price: parsePositiveNumber(packageInput.price),
+    discountPrice:
+      packageInput.discountPrice === "" || packageInput.discountPrice === undefined
+        ? ""
+        : parsePositiveNumber(packageInput.discountPrice),
     currency: packageInput.currency?.trim() || "BDT",
     validityDays: Math.floor(parsePositiveNumber(packageInput.validityDays)),
     status: packageInput.status || "draft",
-    packageType: packageInput.packageType || "Course Base",
-    packageTypeNote: packageInput.packageTypeNote?.trim() || "",
-    totalPurchased: Math.floor(parsePositiveNumber(packageInput.totalPurchased)),
-    totalSellAmount: parsePositiveNumber(packageInput.totalSellAmount),
+    packageType: packageInput.packageType || currentPackage.packageType || "Course Base",
+    packageTypeNote:
+      packageInput.packageTypeNote?.trim() || currentPackage.packageTypeNote || "",
+    totalPurchased: Math.floor(
+      parsePositiveNumber(packageInput.totalPurchased ?? currentPackage.totalPurchased),
+    ),
+    totalSellAmount: parsePositiveNumber(
+      packageInput.totalSellAmount ?? currentPackage.totalSellAmount,
+    ),
     url: packageInput.url?.trim() || "",
     imageUrl: packageInput.imageUrl?.trim() || "",
+    bannerImageUrl: packageInput.bannerImageUrl?.trim() || "",
+    iconImageUrl: packageInput.iconImageUrl?.trim() || "",
+    publishedAt: packageInput.publishedAt?.trim() || "",
     summary: packageInput.summary?.trim() || "",
     rules: htmlToPackageRuleLines(rulesHtml),
     rulesHtml,
-    permissions: normalizePermissions(packageInput.permissions),
+    permissions,
   };
 }
 

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { AppShell } from "@/components/layout/AppShell";
 import { StoreProvider } from "@/components/providers/StoreProvider";
 import { AUTH_COOKIE_NAME } from "@/lib/auth";
+import "katex/dist/katex.min.css";
 import "./globals.css";
 
 const geistSans = Geist({
