@@ -5,6 +5,7 @@ import {
   CalendarClock,
   ChevronDown,
   ChevronRight,
+  FolderTree,
   GraduationCap,
   LayoutDashboard,
   Megaphone,
@@ -35,6 +36,11 @@ const menuItems = [
       { label: "Question Bank", href: "/exams/questions" },
       { label: "Results", href: "/exams/results" },
     ],
+  },
+  {
+    label: "Categories",
+    icon: FolderTree,
+    href: "/categories",
   },
   {
     label: "Courses",
