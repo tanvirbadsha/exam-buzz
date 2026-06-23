@@ -16,6 +16,7 @@ import {
   ShieldAlert,
   UserRoundCog,
   Users,
+  Video,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -93,6 +94,11 @@ const menuItems = [
     label: "Class Routine",
     icon: CalendarClock,
     href: "/class-routine",
+  },
+  {
+    label: "Record Class",
+    icon: Video,
+    href: "/record-class",
   },
   {
     label: "Roles & Access",
