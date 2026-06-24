@@ -1,8 +1,14 @@
 "use client";
 
+import { ErrorCard } from "@/components/ui/ErrorCard";
+import { GlobalSpinner } from "@/components/ui/GlobalSpinner";
+import { useGetAdminByIdQuery } from "@/features/auth/api/authApi";
 import { AdminAvatar } from "@/features/users/admin/AdminAvatar";
 import { AdminNotFound } from "@/features/users/admin/AdminNotFound";
-import { useAdminManagement } from "@/hooks/useAdminManagement";
+import {
+  getApiErrorMessage,
+  normalizeAdmin,
+} from "@/features/users/admin/adminUtils";
 import { ADMIN_MENU_OPTIONS, getRoleLabel } from "@/lib/adminData";
 import { ArrowLeft, KeyRound, Pencil } from "lucide-react";
 import Link from "next/link";
@@ -21,17 +27,26 @@ function AdminDetailRow({ label, value }) {
 
 export default function ViewAdminPage() {
   const { adminId } = useParams();
-  const { getAdminById, isLoaded } = useAdminManagement();
-  const admin = getAdminById(adminId);
+  const {
+    data,
+    error,
+    isLoading,
+    refetch,
+  } = useGetAdminByIdQuery(adminId);
+  const admin = normalizeAdmin(data?.admin);
 
-  if (!isLoaded) {
+  if (isLoading) return <GlobalSpinner label="Loading admin details..." />;
+
+  if (error?.status === 404) return <AdminNotFound />;
+  if (error) {
     return (
-      <div className="mx-auto w-full max-w-5xl">
-        <div className="surface-card h-56 animate-pulse" />
-      </div>
+      <ErrorCard
+        title="Unable to load admin"
+        message={getApiErrorMessage(error, "The admin profile could not load.")}
+        onRetry={refetch}
+      />
     );
   }
-
   if (!admin) return <AdminNotFound />;
 
   const accessLabels = ADMIN_MENU_OPTIONS.flatMap(
@@ -86,7 +101,6 @@ export default function ViewAdminPage() {
           <dl>
             <AdminDetailRow label="Phone" value={admin.phone} />
             <AdminDetailRow label="Email" value={admin.email} />
-            <AdminDetailRow label="Address" value={admin.address} />
             <AdminDetailRow
               label="Created"
               value={new Intl.DateTimeFormat("en", {

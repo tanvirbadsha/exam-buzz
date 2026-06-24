@@ -4,7 +4,12 @@ import { X } from "lucide-react";
 import { useEffect } from "react";
 import { AdminForm } from "./AdminForm";
 
-export function CreateAdminModal({ isOpen, onClose, onCreate }) {
+export function CreateAdminModal({
+  isOpen,
+  onClose,
+  onCreate,
+  isSubmitting = false,
+}) {
   useEffect(() => {
     if (!isOpen) return undefined;
 
@@ -60,15 +65,17 @@ export function CreateAdminModal({ isOpen, onClose, onCreate }) {
         <div className="p-5">
           <AdminForm
             submitLabel="Create admin"
-            onSubmit={(adminInput) => {
-              onCreate(adminInput);
-              onClose();
+            isSubmitting={isSubmitting}
+            onSubmit={async (adminInput) => {
+              const created = await onCreate(adminInput);
+              if (created) onClose();
             }}
             secondaryAction={
               <button
                 type="button"
                 className="button button-secondary"
                 onClick={onClose}
+                disabled={isSubmitting}
               >
                 Cancel
               </button>
