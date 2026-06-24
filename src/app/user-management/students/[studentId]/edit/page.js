@@ -6,50 +6,20 @@ import { TextInput } from "@/components/ui/forms/TextInput";
 import {
   useChangeStudentPassMutation,
   useGetStudentByIdQuery,
-  useUpdateStudentProfileMutation,
 } from "@/features/users/student/api/studentApi";
-import { StudentForm } from "@/features/users/student/StudentForm";
 import { StudentNotFound } from "@/features/users/student/StudentNotFound";
 import {
-  appendIfPresent,
   getApiErrorMessage,
   normalizeStudent,
 } from "@/features/users/student/studentUtils";
 import { ArrowLeft, ClipboardCopy, LockKeyhole, X } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useState } from "react";
 import toast from "react-hot-toast";
 
-function buildChangedStudentFormData(student, studentInput) {
-  const formData = new FormData();
-
-  if (studentInput.name !== student.name) {
-    formData.append("name", studentInput.name);
-  }
-
-  if (studentInput.phone !== student.phone) {
-    formData.append("phone", studentInput.phone);
-  }
-
-  if (studentInput.email !== student.email) {
-    formData.append("email", studentInput.email);
-  }
-
-  if (studentInput.image instanceof File) {
-    appendIfPresent(formData, "image", studentInput.image);
-  }
-
-  return formData;
-}
-
-function formDataHasEntries(formData) {
-  return !formData.entries().next().done;
-}
-
 export default function EditStudentPage() {
   const { studentId } = useParams();
-  const router = useRouter();
   const [newPassword, setNewPassword] = useState("");
   const [resetPasswordToCopy, setResetPasswordToCopy] = useState("");
   const {
@@ -58,8 +28,6 @@ export default function EditStudentPage() {
     isLoading,
     refetch,
   } = useGetStudentByIdQuery(studentId);
-  const [updateStudentProfile, { isLoading: isUpdating }] =
-    useUpdateStudentProfileMutation();
   const [changeStudentPass, { isLoading: isResettingPassword }] =
     useChangeStudentPassMutation();
   const student = normalizeStudent(data?.student || data);
@@ -80,28 +48,6 @@ export default function EditStudentPage() {
     );
   }
   if (!student) return <StudentNotFound />;
-
-  const handleSubmit = async (studentInput) => {
-    const changedFormData = buildChangedStudentFormData(student, studentInput);
-
-    if (!formDataHasEntries(changedFormData)) {
-      toast.error("No profile changes to save.");
-      return;
-    }
-
-    try {
-      await updateStudentProfile({
-        id: student.id,
-        body: changedFormData,
-      }).unwrap();
-      toast.success(`${studentInput.name} updated.`);
-      router.push(`/user-management/students/${student.id}/view`);
-    } catch (updateError) {
-      toast.error(
-        getApiErrorMessage(updateError, "Failed to update student."),
-      );
-    }
-  };
 
   const handlePasswordReset = async () => {
     const password = newPassword.trim();
@@ -155,26 +101,9 @@ export default function EditStudentPage() {
           Edit student
         </h1>
         <p className="mt-2 text-sm text-muted">
-          Update account details for {student.name}.
+          Reset the account password for {student.name}.
         </p>
       </div>
-
-      <section className="surface-card p-5">
-        <StudentForm
-          student={student}
-          submitLabel="Save changes"
-          onSubmit={handleSubmit}
-          isSubmitting={isUpdating}
-          secondaryAction={
-            <Link
-              href={`/user-management/students/${student.id}/view`}
-              className="button button-secondary"
-            >
-              Cancel
-            </Link>
-          }
-        />
-      </section>
 
       <section className="surface-card p-5">
         <div className="mb-4">
@@ -182,8 +111,7 @@ export default function EditStudentPage() {
             Reset password
           </h2>
           <p className="mt-1 text-sm text-muted">
-            Reset this student account password separately from profile
-            details.
+            Student profile details are read-only for admins.
           </p>
         </div>
 
