@@ -6,6 +6,7 @@ import { SubjectForm } from "./SubjectForm";
 
 export function SubjectModal({
   defaultParentId,
+  isSubmitting = false,
   isOpen,
   mode,
   onClose,
@@ -30,6 +31,10 @@ export function SubjectModal({
 
   const title = mode === "edit" ? "Edit subject" : "Create subject";
   const submitLabel = mode === "edit" ? "Save changes" : "Create subject";
+  const description =
+    mode === "edit"
+      ? "Update the subject name, icon, or parent relation."
+      : "Set the subject name, icon, parent relation, and status.";
 
   return (
     <div
@@ -53,9 +58,7 @@ export function SubjectModal({
             >
               {title}
             </h2>
-            <p className="mt-1 text-sm text-muted">
-              Set the subject name, icon, parent relation, and status.
-            </p>
+            <p className="mt-1 text-sm text-muted">{description}</p>
           </div>
           <button
             type="button"
@@ -70,18 +73,23 @@ export function SubjectModal({
         <div className="px-5 py-5 sm:px-6 sm:py-6">
           <SubjectForm
             defaultParentId={defaultParentId}
+            isSubmitting={isSubmitting}
+            mode={mode}
             parentOptions={parentOptions}
             subject={subject}
             submitLabel={submitLabel}
-            onSubmit={(subjectInput) => {
-              onSubmit(subjectInput);
-              onClose();
+            onSubmit={async (subjectInput) => {
+              const shouldClose = await onSubmit(subjectInput);
+              if (shouldClose !== false) {
+                onClose();
+              }
             }}
             secondaryAction={
               <button
                 type="button"
                 className="button button-secondary"
                 onClick={onClose}
+                disabled={isSubmitting}
               >
                 Cancel
               </button>
