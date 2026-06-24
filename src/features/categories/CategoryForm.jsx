@@ -1,11 +1,9 @@
 "use client";
 
 import { CustomDropdown } from "@/components/ui/forms/CustomDropdown";
+import { FileUpload } from "@/components/ui/forms/FileUpload";
 import { TextInput } from "@/components/ui/forms/TextInput";
-import {
-  CATEGORY_STATUS_OPTIONS,
-  createCategorySlug,
-} from "@/lib/categoryData";
+import { CATEGORY_STATUS_OPTIONS } from "@/lib/categoryData";
 import { FileText } from "lucide-react";
 import { useMemo, useState } from "react";
 import { HierarchicalCategoryDropdown } from "./HierarchicalCategoryDropdown";
@@ -18,11 +16,9 @@ const statusOptions = CATEGORY_STATUS_OPTIONS.filter(
 
 const emptyCategory = {
   name: "",
-  slug: "",
-  description: "",
   parentId: ROOT_PARENT_VALUE,
   status: "active",
-  examCount: 0,
+  icon: null,
 };
 
 function buildInitialForm(category, defaultParentId) {
@@ -35,8 +31,10 @@ function buildInitialForm(category, defaultParentId) {
 
   return {
     ...emptyCategory,
-    ...category,
+    name: category.name || "",
     parentId: category.parentId || ROOT_PARENT_VALUE,
+    status: category.status ? "active" : "inactive",
+    icon: null,
   };
 }
 
@@ -56,6 +54,8 @@ export function CategoryForm({
   onSubmit,
   parentOptions,
   secondaryAction,
+  isSubmitting = false,
+  mode = "create",
   submitLabel = "Save category",
 }) {
   const initialForm = useMemo(
@@ -74,23 +74,6 @@ export function CategoryForm({
     });
   };
 
-  const handleNameChange = (event) => {
-    const name = event.target.value;
-    setForm((currentForm) => ({
-      ...currentForm,
-      name,
-      slug:
-        currentForm.slug && category
-          ? currentForm.slug
-          : createCategorySlug(name),
-    }));
-    setErrors((currentErrors) => {
-      const nextErrors = { ...currentErrors };
-      delete nextErrors.name;
-      return nextErrors;
-    });
-  };
-
   const handleSubmit = (event) => {
     event.preventDefault();
     const nextErrors = buildErrors(form);
@@ -100,7 +83,7 @@ export function CategoryForm({
 
     onSubmit({
       ...form,
-      parentId: form.parentId === ROOT_PARENT_VALUE ? null : form.parentId,
+      parentID: form.parentId === ROOT_PARENT_VALUE ? null : form.parentId,
     });
   };
 
@@ -112,7 +95,7 @@ export function CategoryForm({
           name="name"
           icon={FileText}
           value={form.name}
-          onChange={handleNameChange}
+          onChange={(event) => updateField("name", event.target.value)}
           error={errors.name}
           placeholder="BCS Preliminary"
         />
@@ -122,22 +105,41 @@ export function CategoryForm({
           options={parentOptions}
           value={form.parentId}
           onChange={(option) => updateField("parentId", option.value)}
-          placeholder=""
+          placeholder="No parent"
           searchPlaceholder="Search categories..."
         />
 
-        <CustomDropdown
-          label="Status"
-          options={statusOptions}
-          value={form.status}
-          onChange={(option) => updateField("status", option.value)}
-          placeholder="Select status"
+        {mode === "create" && (
+          <CustomDropdown
+            label="Status"
+            options={statusOptions}
+            value={form.status}
+            onChange={(option) => updateField("status", option.value)}
+            placeholder="Select status"
+          />
+        )}
+
+        <FileUpload
+          label="Icon"
+          name="icon"
+          accept=".jpg,.jpeg,.png,.webp,.svg"
+          existingUrl={category?.icon || ""}
+          existingFileName={category?.icon ? "Current icon" : ""}
+          uploadHint="JPG, PNG, WebP, or SVG"
+          onChange={(event) =>
+            updateField("icon", event.target.files?.[0] || null)
+          }
+          onRemoveExisting={() => updateField("icon", null)}
         />
       </div>
 
       <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end">
         {secondaryAction}
-        <button type="submit" className="button button-primary">
+        <button
+          type="submit"
+          className="button button-primary"
+          disabled={isSubmitting}
+        >
           {submitLabel}
         </button>
       </div>

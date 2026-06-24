@@ -1,5 +1,10 @@
 "use client";
 
+import { ErrorCard } from "@/components/ui/ErrorCard";
+import { FloatingActionMenu } from "@/components/ui/FloatingActionMenu";
+import { GlobalSpinner } from "@/components/ui/GlobalSpinner";
+import { Pagination } from "@/components/ui/Pagination";
+import { StatusToggle } from "@/components/ui/StatusToggle";
 import {
   Table,
   TableBody,
@@ -10,14 +15,29 @@ import {
   TableTd,
   TableTh,
 } from "@/components/ui/CustomTable";
-import { FloatingActionMenu } from "@/components/ui/FloatingActionMenu";
 import { CustomDropdown } from "@/components/ui/forms/CustomDropdown";
-import { StatusToggle } from "@/components/ui/StatusToggle";
-import { useCategoryManagement } from "@/hooks/useCategoryManagement";
+import {
+  categoryApi,
+  useCreateCategoryMutation,
+  useDeleteCategoryMutation,
+  useGetAllCategoriesQuery,
+  useGetCategoryByIdQuery,
+  useUpdateCategoryMutation,
+  useUpdateCategoryStatusMutation,
+} from "@/features/categories/api/categoryApi";
+import {
+  buildCategoryCreateFormData,
+  buildCategoryUpdateFormData,
+  extractCategoryFromResponse,
+  getApiErrorMessage,
+  hasFormDataEntries,
+  normalizeCategory,
+} from "@/features/categories/categoryUtils";
 import { CATEGORY_STATUS_OPTIONS } from "@/lib/categoryData";
 import {
   ArrowLeft,
   ChevronRight,
+  Eye,
   FolderOpen,
   FolderTree,
   Pencil,
@@ -26,16 +46,37 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import { useDispatch } from "react-redux";
 import { ROOT_PARENT_VALUE } from "./CategoryForm";
 import { CategoryModal } from "./CategoryModal";
 
-function CategoryActionMenu({ category, onDelete, onEdit }) {
+const CATEGORY_PAGE_LIMIT = 10;
+const INITIAL_QUERY_ARGS = {
+  search: "",
+  status: "all",
+  page: 1,
+  limit: CATEGORY_PAGE_LIMIT,
+};
+
+function CategoryActionMenu({ category, onDelete, onEdit, onView }) {
   return (
     <FloatingActionMenu ariaLabel={`Open actions for ${category.name}`}>
       {({ closeMenu }) => (
         <>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              closeMenu();
+              onView(category);
+            }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-surface-muted"
+          >
+            <Eye size={15} className="text-muted" />
+            View
+          </button>
           <button
             type="button"
             role="menuitem"
@@ -72,8 +113,65 @@ function sortCategories(categories) {
   );
 }
 
+function buildChildrenMap(categories) {
+  const childrenMap = new Map();
+
+  categories.forEach((category) => {
+    const parentKey = category.parentId || "root";
+    const children = childrenMap.get(parentKey) || [];
+    children.push(category);
+    childrenMap.set(parentKey, children);
+  });
+
+  return childrenMap;
+}
+
+function getDescendantIds(childrenMap, categoryId) {
+  const descendantIds = new Set();
+  const stack = [...(childrenMap.get(categoryId) || [])];
+
+  while (stack.length > 0) {
+    const category = stack.pop();
+    if (!category || descendantIds.has(category.id)) continue;
+
+    descendantIds.add(category.id);
+    stack.push(...(childrenMap.get(category.id) || []));
+  }
+
+  return descendantIds;
+}
+
+function buildCategoryIndex(categories) {
+  const categoriesById = new Map(
+    categories.map((category) => [category.id, category]),
+  );
+  const childrenMap = buildChildrenMap(categories);
+  const directChildCounts = new Map();
+  const descendantCounts = new Map();
+
+  categories.forEach((category) => {
+    directChildCounts.set(category.id, childrenMap.get(category.id)?.length || 0);
+    descendantCounts.set(category.id, getDescendantIds(childrenMap, category.id).size);
+  });
+
+  return {
+    categoriesById,
+    childrenMap,
+    directChildCounts,
+    descendantCounts,
+  };
+}
+
 function buildParentOptions(childrenMap, excludedIds = new Set()) {
-  const options = [];
+  const options = [
+    {
+      label: "No parent",
+      value: ROOT_PARENT_VALUE,
+      depth: 0,
+      meta: "Top-level category",
+      searchText: "top level no parent",
+    },
+  ];
 
   const walk = (parentId = "root", depth = 0, parentPath = []) => {
     const children = sortCategories(childrenMap.get(parentId) || []);
@@ -111,30 +209,112 @@ function getCategoryPath(categoriesById, categoryId) {
   return path;
 }
 
-export function CategoryManager({ initialCategories }) {
-  const {
-    categories,
-    categoryIndex,
-    createCategory,
-    deleteCategory,
-    totals,
-    updateCategory,
-    updateCategoryStatus,
-  } = useCategoryManagement(initialCategories);
+function matchesStatusFilter(category, statusFilter) {
+  if (statusFilter === "all") return true;
+  return statusFilter === "active" ? category.status : !category.status;
+}
+
+export function CategoryManager({ initialData }) {
+  const dispatch = useDispatch();
   const [selectedParentId, setSelectedParentId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
   const [modalState, setModalState] = useState({
     isOpen: false,
     mode: "create",
     category: null,
   });
-  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const [pendingStatusIds, setPendingStatusIds] = useState(() => new Set());
+  const [hasHydratedInitialData, setHasHydratedInitialData] = useState(
+    () => !initialData || Boolean(initialData._error),
+  );
+  const deferredSearchQuery = useDeferredValue(searchQuery.trim());
 
+  useEffect(() => {
+    if (!initialData || initialData._error) {
+      return;
+    }
+
+    dispatch(
+      categoryApi.util.upsertQueryData(
+        "getAllCategories",
+        INITIAL_QUERY_ARGS,
+        initialData,
+      ),
+    );
+    queueMicrotask(() => setHasHydratedInitialData(true));
+  }, [dispatch, initialData]);
+
+  const queryArgs = useMemo(
+    () => ({
+      search: deferredSearchQuery,
+      status: statusFilter,
+      page,
+      limit: CATEGORY_PAGE_LIMIT,
+    }),
+    [deferredSearchQuery, page, statusFilter],
+  );
+
+  const shouldUseInitialData =
+    !hasHydratedInitialData &&
+    page === 1 &&
+    deferredSearchQuery === "" &&
+    statusFilter === "all" &&
+    Boolean(initialData) &&
+    !initialData?._error;
+
+  const {
+    data: queryData,
+    error,
+    isLoading,
+    isFetching,
+    refetch,
+  } = useGetAllCategoriesQuery(queryArgs, {
+    skip: shouldUseInitialData,
+    placeholderData: shouldUseInitialData ? initialData : undefined,
+  });
+  const [createCategory, { isLoading: isCreating }] =
+    useCreateCategoryMutation();
+  const [updateCategory, { isLoading: isUpdating }] =
+    useUpdateCategoryMutation();
+  const [updateCategoryStatus] = useUpdateCategoryStatusMutation();
+  const [deleteCategory, { isLoading: isDeleting }] =
+    useDeleteCategoryMutation();
+
+  const data = shouldUseInitialData ? initialData : queryData;
+  const categories = useMemo(
+    () => (data?.categories || []).map(normalizeCategory).filter(Boolean),
+    [data],
+  );
+  const pagination = data?.pagination || {
+    total: 0,
+    page,
+    limit: CATEGORY_PAGE_LIMIT,
+    totalPages: 0,
+  };
+  const categoryIndex = useMemo(() => buildCategoryIndex(categories), [categories]);
   const selectedCategory =
     selectedParentId && categoryIndex.categoriesById.has(selectedParentId)
       ? categoryIndex.categoriesById.get(selectedParentId)
       : null;
+  const viewCategoryId =
+    modalState.mode === "view" ? modalState.category?.id : undefined;
+  const {
+    data: detailData,
+    error: detailError,
+    isFetching: isFetchingDetail,
+    refetch: refetchDetail,
+  } = useGetCategoryByIdQuery(viewCategoryId, {
+    skip: !viewCategoryId,
+  });
+  const detailCategory = useMemo(
+    () =>
+      normalizeCategory(extractCategoryFromResponse(detailData)) ||
+      modalState.category,
+    [detailData, modalState.category],
+  );
+
   const currentParentKey = selectedCategory?.id || "root";
   const currentCategories = useMemo(
     () => sortCategories(categoryIndex.childrenMap.get(currentParentKey) || []),
@@ -149,19 +329,13 @@ export function CategoryManager({ initialCategories }) {
   );
 
   const filteredCategories = useMemo(() => {
-    const query = deferredSearchQuery.trim().toLowerCase();
+    const query = deferredSearchQuery.toLowerCase();
 
     return currentCategories.filter((category) => {
       const matchesSearch =
-        !query ||
-        [category.name, category.slug, category.description]
-          .join(" ")
-          .toLowerCase()
-          .includes(query);
-      const matchesStatus =
-        statusFilter === "all" || category.status === statusFilter;
+        !query || category.name.toLowerCase().includes(query);
 
-      return matchesSearch && matchesStatus;
+      return matchesSearch && matchesStatusFilter(category, statusFilter);
     });
   }, [currentCategories, deferredSearchQuery, statusFilter]);
 
@@ -170,26 +344,37 @@ export function CategoryManager({ initialCategories }) {
 
     if (modalState.mode === "edit" && modalState.category) {
       excludedIds.add(modalState.category.id);
-      categoryIndex.descendantCounts.forEach((_, categoryId) => {
-        const path = getCategoryPath(categoryIndex.categoriesById, categoryId);
-        const isDescendant = path.some(
-          (pathCategory) => pathCategory.id === modalState.category.id,
-        );
-
-        if (isDescendant && categoryId !== modalState.category.id) {
-          excludedIds.add(categoryId);
-        }
-      });
+      getDescendantIds(
+        categoryIndex.childrenMap,
+        modalState.category.id,
+      ).forEach((categoryId) => excludedIds.add(categoryId));
     }
 
     return buildParentOptions(categoryIndex.childrenMap, excludedIds);
-  }, [
-    categoryIndex.categoriesById,
-    categoryIndex.childrenMap,
-    categoryIndex.descendantCounts,
-    modalState.category,
-    modalState.mode,
-  ]);
+  }, [categoryIndex.childrenMap, modalState.category, modalState.mode]);
+
+  const totals = useMemo(
+    () => ({
+      total: pagination.total || categories.length,
+      root: categories.filter((category) => !category.parentId).length,
+      active: categories.filter((category) => category.status).length,
+    }),
+    [categories, pagination.total],
+  );
+
+  const pageStart =
+    pagination.total > 0 ? (page - 1) * CATEGORY_PAGE_LIMIT + 1 : 0;
+  const pageEnd = Math.min(page * CATEGORY_PAGE_LIMIT, pagination.total);
+
+  const handleSearchChange = (event) => {
+    setSearchQuery(event.target.value);
+    setPage(1);
+  };
+
+  const handleStatusFilterChange = (option) => {
+    setStatusFilter(option.value);
+    setPage(1);
+  };
 
   const openCreateModal = () => {
     setModalState({ isOpen: true, mode: "create", category: null });
@@ -199,6 +384,10 @@ export function CategoryManager({ initialCategories }) {
     setModalState({ isOpen: true, mode: "edit", category });
   };
 
+  const openViewModal = (category) => {
+    setModalState({ isOpen: true, mode: "view", category });
+  };
+
   const closeModal = () => {
     setModalState((currentState) => ({ ...currentState, isOpen: false }));
   };
@@ -206,6 +395,7 @@ export function CategoryManager({ initialCategories }) {
   const resetFilters = () => {
     setSearchQuery("");
     setStatusFilter("all");
+    setPage(1);
   };
 
   const drillIntoCategory = (category) => {
@@ -213,26 +403,58 @@ export function CategoryManager({ initialCategories }) {
     resetFilters();
   };
 
-  const handleSubmit = (categoryInput) => {
+  const handleSubmit = async (categoryInput) => {
     if (modalState.mode === "edit" && modalState.category) {
-      const updatedCategory = updateCategory(
-        modalState.category.id,
+      const formData = buildCategoryUpdateFormData(
         categoryInput,
+        modalState.category,
       );
-      if (updatedCategory) {
-        toast.success(`${updatedCategory.name} updated.`);
+
+      if (!hasFormDataEntries(formData)) {
+        toast.success("No category changes to save.");
+        return true;
       }
-      return;
+
+      try {
+        const response = await updateCategory({
+          id: modalState.category.id,
+          body: formData,
+        }).unwrap();
+        const updatedCategory =
+          normalizeCategory(extractCategoryFromResponse(response)) ||
+          modalState.category;
+        toast.success(`${updatedCategory.name} updated.`);
+        return true;
+      } catch (updateError) {
+        toast.error(
+          getApiErrorMessage(updateError, "Failed to update category."),
+        );
+        return false;
+      }
     }
 
-    const createdCategory = createCategory(categoryInput);
-    toast.success(`${createdCategory.name} created.`);
+    try {
+      const response = await createCategory(
+        buildCategoryCreateFormData(categoryInput),
+      ).unwrap();
+      const createdCategory =
+        normalizeCategory(extractCategoryFromResponse(response)) ||
+        categoryInput;
+      toast.success(`${createdCategory.name} created.`);
+      setSearchQuery("");
+      setStatusFilter("all");
+      setPage(1);
+      return true;
+    } catch (createError) {
+      toast.error(
+        getApiErrorMessage(createError, "Failed to create category."),
+      );
+      return false;
+    }
   };
 
-  const handleDelete = (category) => {
-    const childCount = categoryIndex.directChildCounts.get(category.id) || 0;
-    const descendantCount =
-      categoryIndex.descendantCounts.get(category.id) || 0;
+  const handleDelete = async (category) => {
+    const descendantCount = categoryIndex.descendantCounts.get(category.id) || 0;
     const confirmed = window.confirm(
       descendantCount > 0
         ? `Delete ${category.name} and ${descendantCount} nested categor${descendantCount === 1 ? "y" : "ies"}?`
@@ -240,37 +462,71 @@ export function CategoryManager({ initialCategories }) {
     );
     if (!confirmed) return;
 
-    const result = deleteCategory(category.id);
-    if (!result) {
-      toast.error("Category could not be deleted.");
-      return;
-    }
+    try {
+      await deleteCategory(category.id).unwrap();
+      toast.success(`${category.name} deleted.`);
 
-    toast.success(
-      result.deletedCount > 1
-        ? `${result.deletedCount} categories deleted.`
-        : `${category.name} deleted.`,
-    );
-
-    if (childCount > 0) {
-      resetFilters();
+      if (filteredCategories.length === 1 && page > 1) {
+        setPage((currentPage) => Math.max(1, currentPage - 1));
+      }
+    } catch (deleteError) {
+      toast.error(
+        getApiErrorMessage(deleteError, "Failed to delete category."),
+      );
     }
   };
 
-  const handleStatusChange = (category, checked) => {
-    const status = checked ? "active" : "inactive";
-    const updatedCategory = updateCategoryStatus(category.id, status);
-    if (updatedCategory) {
-      toast.success(`${updatedCategory.name} marked ${status}.`);
+  const handleStatusChange = async (category, checked) => {
+    setPendingStatusIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+      nextIds.add(category.id);
+      return nextIds;
+    });
+
+    try {
+      await updateCategoryStatus({
+        id: category.id,
+        status: checked,
+      }).unwrap();
+      toast.success(`${category.name} status updated.`);
+    } catch (statusError) {
+      toast.error(
+        getApiErrorMessage(statusError, "Failed to update category status."),
+      );
+    } finally {
+      setPendingStatusIds((currentIds) => {
+        const nextIds = new Set(currentIds);
+        nextIds.delete(category.id);
+        return nextIds;
+      });
     }
   };
 
+  const initialError = initialData?._error ? initialData : null;
+  const activeError = error || initialError;
   const showParentColumn = Boolean(selectedCategory);
   const tableTitle = selectedCategory ? selectedCategory.name : "Categories";
-  const tableSummary = `${filteredCategories.length} of ${currentCategories.length} ${
+  const tableSummary = `${filteredCategories.length} ${
     selectedCategory ? "direct sub-categories" : "main categories"
-  } shown`;
+  } on this page`;
   const emptyTableColSpan = showParentColumn ? 6 : 5;
+
+  if ((isLoading || !hasHydratedInitialData) && !data && !activeError) {
+    return <GlobalSpinner label="Loading categories..." />;
+  }
+
+  if (activeError && !data?.categories?.length) {
+    return (
+      <ErrorCard
+        title="Unable to load categories"
+        message={getApiErrorMessage(
+          activeError,
+          "The category list could not be loaded.",
+        )}
+        onRetry={error ? refetch : undefined}
+      />
+    );
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
@@ -283,8 +539,8 @@ export function CategoryManager({ initialCategories }) {
             Category hierarchy
           </h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-            Create parent categories, nest sub-categories at any depth, and
-            drill into each level from the sub-category count.
+            Create parent categories, upload icons, and drill into each level
+            from the sub-category count.
           </p>
         </div>
 
@@ -321,9 +577,9 @@ export function CategoryManager({ initialCategories }) {
               <input
                 type="search"
                 value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
+                onChange={handleSearchChange}
                 className="field-input"
-                placeholder="Search name or slug..."
+                placeholder="Search categories..."
                 aria-label="Search categories"
               />
             </span>
@@ -333,7 +589,7 @@ export function CategoryManager({ initialCategories }) {
             label="Status"
             options={CATEGORY_STATUS_OPTIONS}
             value={statusFilter}
-            onChange={(option) => setStatusFilter(option.value)}
+            onChange={handleStatusFilterChange}
             placeholder="All statuses"
           />
 
@@ -399,25 +655,33 @@ export function CategoryManager({ initialCategories }) {
                 {tableTitle}
               </h2>
             )}
-            {selectedCategory && (
-              <h2 className="sr-only">{tableTitle}</h2>
-            )}
+            {selectedCategory && <h2 className="sr-only">{tableTitle}</h2>}
             <p className="text-sm text-muted">{tableSummary}</p>
+            <p className="text-sm text-muted">
+              Showing {pageStart}-{pageEnd} of {pagination.total} API entries
+            </p>
           </div>
 
-          {selectedCategory && (
-            <button
-              type="button"
-              className="button button-secondary"
-              onClick={() => {
-                setSelectedParentId(selectedCategory.parentId || null);
-                resetFilters();
-              }}
-            >
-              <ArrowLeft size={16} />
-              Back one level
-            </button>
-          )}
+          <div className="flex min-h-10 items-center gap-2">
+            <div className="flex min-w-28 justify-end">
+              {isFetching && !isLoading ? (
+                <GlobalSpinner label="Refreshing..." compact />
+              ) : null}
+            </div>
+            {selectedCategory && (
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => {
+                  setSelectedParentId(selectedCategory.parentId || null);
+                  resetFilters();
+                }}
+              >
+                <ArrowLeft size={16} />
+                Back one level
+              </button>
+            )}
+          </div>
         </div>
 
         <TableResponsive>
@@ -439,18 +703,28 @@ export function CategoryManager({ initialCategories }) {
                     categoryIndex.directChildCounts.get(category.id) || 0;
                   const parent =
                     showParentColumn && category.parentId
-                      ? categoryIndex.categoriesById.get(category.parentId)
+                      ? categoryIndex.categoriesById.get(category.parentId) ||
+                        category.parent
                       : null;
 
                   return (
                     <TableRow key={category.id}>
                       <TableTd className="font-mono text-xs text-muted">
-                        {String(index + 1).padStart(2, "0")}
+                        {String(
+                          (page - 1) * CATEGORY_PAGE_LIMIT + index + 1,
+                        ).padStart(2, "0")}
                       </TableTd>
                       <TableTd>
                         <div className="flex min-w-72 items-start gap-3">
-                          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand-strong">
-                            {directChildCount > 0 ? (
+                          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-brand-soft text-brand-strong">
+                            {category.icon ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={category.icon}
+                                alt={`${category.name} icon`}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : directChildCount > 0 ? (
                               <FolderOpen size={17} />
                             ) : (
                               <FolderTree size={17} />
@@ -461,7 +735,7 @@ export function CategoryManager({ initialCategories }) {
                               {category.name}
                             </p>
                             <p className="mt-1 text-xs font-medium text-muted">
-                              /{category.slug || "category"}
+                              ID: {category.id}
                             </p>
                           </div>
                         </div>
@@ -489,7 +763,8 @@ export function CategoryManager({ initialCategories }) {
                       </TableTd>
                       <TableTd>
                         <StatusToggle
-                          checked={category.status === "active"}
+                          checked={category.status}
+                          disabled={pendingStatusIds.has(category.id)}
                           label={`Set ${category.name} active status`}
                           onChange={(checked) =>
                             handleStatusChange(category, checked)
@@ -501,6 +776,7 @@ export function CategoryManager({ initialCategories }) {
                           category={category}
                           onDelete={handleDelete}
                           onEdit={openEditModal}
+                          onView={openViewModal}
                         />
                       </TableTd>
                     </TableRow>
@@ -524,15 +800,26 @@ export function CategoryManager({ initialCategories }) {
             </TableBody>
           </Table>
         </TableResponsive>
+
+        <Pagination
+          currentPage={page}
+          totalItems={pagination.total}
+          itemsPerPage={CATEGORY_PAGE_LIMIT}
+          onPageChange={setPage}
+        />
       </TableContainer>
 
       <CategoryModal
-        category={modalState.category}
+        category={modalState.mode === "view" ? detailCategory : modalState.category}
         defaultParentId={selectedCategory?.id || ROOT_PARENT_VALUE}
+        detailError={detailError}
+        detailLoading={isFetchingDetail && !detailData}
         isOpen={modalState.isOpen}
+        isSubmitting={isCreating || isUpdating}
         mode={modalState.mode}
         parentOptions={parentOptions}
         onClose={closeModal}
+        onRetryDetail={refetchDetail}
         onSubmit={handleSubmit}
       />
     </div>
