@@ -1,11 +1,18 @@
 "use client";
 
+import { ErrorCard } from "@/components/ui/ErrorCard";
+import { GlobalSpinner } from "@/components/ui/GlobalSpinner";
+import { useGetStudentByIdQuery } from "@/features/users/student/api/studentApi";
 import { StudentNotFound } from "@/features/users/student/StudentNotFound";
-import { useStudentManagement } from "@/hooks/useStudentManagement";
-import { formatStudentCurrency } from "@/lib/studentData";
-import { ArrowLeft, Eye, Pencil } from "lucide-react";
+import {
+  getApiErrorMessage,
+  normalizeStudent,
+} from "@/features/users/student/studentUtils";
+import { ArrowLeft, Pencil } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+
+const EMPTY_VALUE = "N/A";
 
 function DetailRow({ label, value }) {
   return (
@@ -18,33 +25,31 @@ function DetailRow({ label, value }) {
   );
 }
 
-function MetricCard({ action, label, value }) {
-  return (
-    <article className="rounded-lg border border-border bg-surface-muted p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-muted">{label}</p>
-          <p className="mt-2 text-xl font-bold text-foreground">{value}</p>
-        </div>
-        {action}
-      </div>
-    </article>
-  );
-}
-
 export default function ViewStudentPage() {
   const { studentId } = useParams();
-  const { getStudentById, isLoaded } = useStudentManagement();
-  const student = getStudentById(studentId);
+  const {
+    data,
+    error,
+    isLoading,
+    refetch,
+  } = useGetStudentByIdQuery(studentId);
+  const student = normalizeStudent(data?.student || data);
 
-  if (!isLoaded) {
+  if (isLoading) return <GlobalSpinner label="Loading student..." />;
+
+  if (error?.status === 404) return <StudentNotFound />;
+  if (error) {
     return (
-      <div className="mx-auto w-full max-w-5xl">
-        <div className="surface-card h-56 animate-pulse" />
-      </div>
+      <ErrorCard
+        title="Unable to load student"
+        message={getApiErrorMessage(
+          error,
+          "The student profile could not load.",
+        )}
+        onRetry={refetch}
+      />
     );
   }
-
   if (!student) return <StudentNotFound />;
 
   return (
@@ -59,7 +64,7 @@ export default function ViewStudentPage() {
             Student details
           </h1>
           <p className="mt-2 text-sm text-muted">
-            Review account identity, purchase summary, and exam activity.
+            Review account identity and contact details.
           </p>
         </div>
         <Link
@@ -79,7 +84,7 @@ export default function ViewStudentPage() {
                 {student.name}
               </h2>
               <p className="mt-1 text-sm font-medium text-muted">
-                {student.userId} / {student.registrationId}
+                ID: {student.id}
               </p>
             </div>
             <span
@@ -94,52 +99,45 @@ export default function ViewStudentPage() {
           </div>
         </div>
 
-        <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
-          <dl>
-            <DetailRow label="Phone" value={student.phone} />
-            <DetailRow label="Email" value={student.email || "Not provided"} />
-            <DetailRow
-              label="Address"
-              value={student.address || "Not provided"}
-            />
-            <DetailRow
-              label="Purchased package"
-              value={student.purchasedPackage}
-            />
-            <DetailRow
-              label="Created"
-              value={new Intl.DateTimeFormat("en", {
-                dateStyle: "medium",
-                timeStyle: "short",
-              }).format(new Date(student.createdAt))}
-            />
-          </dl>
-
-          <aside className="space-y-4">
-            <MetricCard
-              label="Purchased package"
-              value={student.purchasedPackageCount}
-            />
-            <MetricCard
-              label="Purchase amount"
-              value={formatStudentCurrency(student.purchaseAmount)}
-              action={
-                <Link
-                  href={`/user-management/students/${student.id}/package-history`}
-                  className="icon-button h-9 w-9 border border-border bg-surface"
-                  aria-label={`View package history for ${student.name}`}
-                >
-                  <Eye size={16} />
-                </Link>
-              }
-            />
-            <MetricCard
-              label="Preliminary exam"
-              value={student.preliminaryExam}
-            />
-            <MetricCard label="Written exam" value={student.writtenExam} />
-          </aside>
-        </div>
+        <dl className="p-5">
+          <DetailRow label="Phone" value={student.phone || EMPTY_VALUE} />
+          <DetailRow label="Email" value={student.email || EMPTY_VALUE} />
+          <DetailRow
+            label="Gender"
+            value={student.gender || EMPTY_VALUE}
+          />
+          <DetailRow
+            label="Created"
+            value={
+              student.createdAt
+                ? new Intl.DateTimeFormat("en", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  }).format(new Date(student.createdAt))
+                : EMPTY_VALUE
+            }
+          />
+          <DetailRow
+            label="Reg ID"
+            value={student.registrationId || EMPTY_VALUE}
+          />
+          <DetailRow
+            label="Purchased package"
+            value={student.purchasedPackage || EMPTY_VALUE}
+          />
+          <DetailRow
+            label="Purchase amount"
+            value={student.purchaseAmount ?? EMPTY_VALUE}
+          />
+          <DetailRow
+            label="Preli exam"
+            value={student.preliminaryExam ?? EMPTY_VALUE}
+          />
+          <DetailRow
+            label="Written exam"
+            value={student.writtenExam ?? EMPTY_VALUE}
+          />
+        </dl>
       </section>
     </div>
   );
