@@ -1,23 +1,36 @@
 "use client";
 
-import { AtSign, LockKeyhole, MapPin, Phone, UserRound } from "lucide-react";
+import {
+  AtSign,
+  CheckCircle2,
+  LockKeyhole,
+  Phone,
+  UserRound,
+  UsersRound,
+} from "lucide-react";
 import { useMemo, useState } from "react";
+import { CustomDropdown } from "@/components/ui/forms/CustomDropdown";
 import { TextInput } from "@/components/ui/forms/TextInput";
+import {
+  STUDENT_ACCOUNT_STATUS_OPTIONS,
+  STUDENT_GENDER_OPTIONS,
+} from "@/lib/studentData";
 
 const emptyTeacher = {
-  fullName: "",
+  name: "",
   phone: "",
   email: "",
   password: "",
-  address: "",
-  permissions: ["BCS"],
+  confirmPassword: "",
+  status: "active",
+  gender: "male",
 };
 
 function buildErrors(form) {
   const errors = {};
 
-  if (!form.fullName.trim()) {
-    errors.fullName = { message: "Full name is required." };
+  if (!form.name.trim()) {
+    errors.name = { message: "Name is required." };
   }
 
   if (!form.phone.trim()) {
@@ -30,17 +43,36 @@ function buildErrors(form) {
     errors.email = { message: "Enter a valid email address." };
   }
 
-  if (!form.password) {
+  if (!form.password.trim()) {
     errors.password = { message: "Password is required." };
-  } else if (form.password.length < 6) {
+  } else if (form.password.trim().length < 6) {
     errors.password = { message: "Password must be at least 6 characters." };
   }
 
-  if (!form.address.trim()) {
-    errors.address = { message: "Address is required." };
+  if (!form.confirmPassword.trim()) {
+    errors.confirmPassword = { message: "Confirm password is required." };
+  } else if (form.password.trim() !== form.confirmPassword.trim()) {
+    errors.confirmPassword = { message: "Passwords do not match." };
   }
 
   return errors;
+}
+
+function getInitialTeacher(teacher) {
+  return {
+    ...emptyTeacher,
+    ...teacher,
+    name: teacher?.name || teacher?.fullName || emptyTeacher.name,
+    status:
+      typeof teacher?.status === "boolean"
+        ? teacher.status
+          ? "active"
+          : "inactive"
+        : teacher?.status || emptyTeacher.status,
+    gender: teacher?.gender || emptyTeacher.gender,
+    password: "",
+    confirmPassword: "",
+  };
 }
 
 export function TeacherForm({
@@ -48,13 +80,15 @@ export function TeacherForm({
   onSubmit,
   submitLabel = "Save teacher",
   secondaryAction,
+  isSubmitting = false,
 }) {
-  const initialForm = useMemo(
-    () => ({ ...emptyTeacher, ...teacher }),
-    [teacher],
-  );
+  const initialForm = useMemo(() => getInitialTeacher(teacher), [teacher]);
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
+  const isPasswordInvalid =
+    !form.password.trim() ||
+    !form.confirmPassword.trim() ||
+    form.password.trim() !== form.confirmPassword.trim();
 
   const updateField = (field, value) => {
     setForm((currentForm) => ({ ...currentForm, [field]: value }));
@@ -74,11 +108,12 @@ export function TeacherForm({
     if (Object.keys(nextErrors).length > 0) return;
 
     onSubmit({
-      ...form,
-      fullName: form.fullName.trim(),
+      name: form.name.trim(),
       phone: form.phone.trim(),
       email: form.email.trim(),
-      address: form.address.trim(),
+      password: form.password.trim(),
+      status: form.status === "active" ? "true" : "false",
+      gender: form.gender,
     });
   };
 
@@ -86,13 +121,22 @@ export function TeacherForm({
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="grid gap-4 md:grid-cols-2">
         <TextInput
-          label="Full Name"
-          name="fullName"
+          label="Name"
+          name="name"
           icon={UserRound}
-          value={form.fullName}
-          onChange={(event) => updateField("fullName", event.target.value)}
-          error={errors.fullName}
-          placeholder="Teacher full name"
+          value={form.name}
+          onChange={(event) => updateField("name", event.target.value)}
+          error={errors.name}
+          placeholder="Teacher name"
+        />
+        <CustomDropdown
+          label="Gender"
+          icon={UsersRound}
+          options={STUDENT_GENDER_OPTIONS}
+          value={form.gender}
+          onChange={(option) => updateField("gender", option.value)}
+          error={errors.gender}
+          placeholder="Select gender"
         />
         <TextInput
           label="Phone"
@@ -123,23 +167,43 @@ export function TeacherForm({
           error={errors.password}
           placeholder="Minimum 6 characters"
         />
-        <div className="md:col-span-2">
-          <TextInput
-            label="Address"
-            name="address"
-            icon={MapPin}
-            value={form.address}
-            onChange={(event) => updateField("address", event.target.value)}
-            error={errors.address}
-            placeholder="City, country"
-          />
-        </div>
+        <TextInput
+          label="Confirm password"
+          name="confirmPassword"
+          type="password"
+          icon={LockKeyhole}
+          value={form.confirmPassword}
+          onChange={(event) =>
+            updateField("confirmPassword", event.target.value)
+          }
+          error={
+            errors.confirmPassword ||
+            (form.confirmPassword &&
+            form.password.trim() !== form.confirmPassword.trim()
+              ? { message: "Passwords do not match." }
+              : undefined)
+          }
+          placeholder="Re-type password"
+        />
+        <CustomDropdown
+          label="Status"
+          icon={CheckCircle2}
+          options={STUDENT_ACCOUNT_STATUS_OPTIONS}
+          value={form.status}
+          onChange={(option) => updateField("status", option.value)}
+          error={errors.status}
+          placeholder="Select status"
+        />
       </div>
 
       <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end">
         {secondaryAction}
-        <button type="submit" className="button button-primary">
-          {submitLabel}
+        <button
+          type="submit"
+          className="button button-primary"
+          disabled={isSubmitting || isPasswordInvalid}
+        >
+          {isSubmitting ? "Saving..." : submitLabel}
         </button>
       </div>
     </form>

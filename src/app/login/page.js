@@ -1,24 +1,12 @@
 "use client";
 
-import {
-  ArrowRight,
-  AtSign,
-  LockKeyhole,
-  ShieldCheck,
-} from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useTransition } from "react";
-import toast from "react-hot-toast";
-import { useDispatch } from "react-redux";
 import { TextInput } from "@/components/ui/forms/TextInput";
-import {
-  AUTH_SESSION_TOKEN,
-  LOGIN_TOAST_KEY,
-  SUPER_ADMIN_USER,
-  createAuthCookieValue,
-  isValidSuperAdminLogin,
-} from "@/lib/auth";
-import { setCredentials } from "@/store/authSlice";
+import { useLoginMutation } from "@/features/auth/api/authApi";
+import { LOGIN_TOAST_KEY } from "@/lib/auth";
+import { ArrowRight, AtSign, LockKeyhole, ShieldCheck } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
+import toast from "react-hot-toast";
 
 const initialForm = {
   email: "",
@@ -56,13 +44,12 @@ function validateForm(form) {
   return errors;
 }
 
-export default function LoginPage() {
+function LoginForm() {
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
-  const [isPending, startTransition] = useTransition();
+  const [login, { isLoading }] = useLoginMutation();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const dispatch = useDispatch();
 
   const updateField = (field, value) => {
     setForm((currentForm) => ({ ...currentForm, [field]: value }));
@@ -74,7 +61,7 @@ export default function LoginPage() {
     });
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
     const nextErrors = validateForm(form);
@@ -85,28 +72,30 @@ export default function LoginPage() {
       return;
     }
 
-    if (!isValidSuperAdminLogin(form)) {
+    try {
+      await login({
+        emailOrPhone: form.email.trim(),
+        password: form.password,
+      }).unwrap();
+
+      window.sessionStorage.setItem(LOGIN_TOAST_KEY, "1");
+      router.replace(
+        getSafeNextPath(
+          searchParams.get("callbackUrl") || searchParams.get("next"),
+        ),
+      );
+      router.refresh();
+    } catch (error) {
       setErrors({
         credentials: {
-          message: "Email or password did not match a super admin account.",
+          message:
+            error?.data?.message ||
+            error?.error ||
+            "Email or password did not match an account.",
         },
       });
       toast.error("Invalid login credentials.");
-      return;
     }
-
-    startTransition(() => {
-      document.cookie = createAuthCookieValue();
-      window.sessionStorage.setItem(LOGIN_TOAST_KEY, "1");
-      dispatch(
-        setCredentials({
-          token: AUTH_SESSION_TOKEN,
-          user: SUPER_ADMIN_USER,
-        }),
-      );
-      router.replace(getSafeNextPath(searchParams.get("next")));
-      router.refresh();
-    });
   };
 
   return (
@@ -157,14 +146,22 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={isPending}
+            disabled={isLoading}
             className="button button-primary min-h-11 w-full"
           >
-            <span>{isPending ? "Signing in..." : "Sign in"}</span>
+            <span>{isLoading ? "Signing in..." : "Sign in"}</span>
             <ArrowRight size={16} />
           </button>
         </form>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

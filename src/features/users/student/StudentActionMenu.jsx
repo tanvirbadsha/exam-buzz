@@ -4,7 +4,7 @@ import { Eye, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { FloatingActionMenu } from "@/components/ui/FloatingActionMenu";
 
-export function StudentActionMenu({ student, onDelete }) {
+export function StudentActionMenu({ student, onDelete, isDeleting = false }) {
   const actionLinks = [
     {
       href: `/user-management/students/${student.id}/view`,
@@ -46,11 +46,12 @@ export function StudentActionMenu({ student, onDelete }) {
           <button
             type="button"
             role="menuitem"
+            disabled={isDeleting}
             onClick={() => {
               closeMenu();
               onDelete(student);
             }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-danger transition-colors hover:bg-rose-50"
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-danger transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Trash2 size={15} />
             Delete

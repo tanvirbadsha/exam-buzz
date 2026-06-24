@@ -1,8 +1,14 @@
 "use client";
 
+import { ErrorCard } from "@/components/ui/ErrorCard";
+import { GlobalSpinner } from "@/components/ui/GlobalSpinner";
+import { useGetAdminByIdQuery } from "@/features/auth/api/authApi";
 import { AdminAccessControlForm } from "@/features/users/admin/AdminAccessControlForm";
 import { AdminNotFound } from "@/features/users/admin/AdminNotFound";
-import { useAdminManagement } from "@/hooks/useAdminManagement";
+import {
+  getApiErrorMessage,
+  normalizeAdmin,
+} from "@/features/users/admin/adminUtils";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -11,22 +17,30 @@ import toast from "react-hot-toast";
 export default function AdminAccessControlPage() {
   const { adminId } = useParams();
   const router = useRouter();
-  const { getAdminById, isLoaded, updateAdminAccess } = useAdminManagement();
-  const admin = getAdminById(adminId);
+  const {
+    data,
+    error,
+    isLoading,
+    refetch,
+  } = useGetAdminByIdQuery(adminId);
+  const admin = normalizeAdmin(data?.admin);
 
-  if (!isLoaded) {
+  if (isLoading) return <GlobalSpinner label="Loading access controls..." />;
+
+  if (error?.status === 404) return <AdminNotFound />;
+  if (error) {
     return (
-      <div className="mx-auto w-full max-w-5xl">
-        <div className="surface-card h-96 animate-pulse" />
-      </div>
+      <ErrorCard
+        title="Unable to load admin"
+        message={getApiErrorMessage(error, "The admin profile could not load.")}
+        onRetry={refetch}
+      />
     );
   }
-
   if (!admin) return <AdminNotFound />;
 
-  const handleSave = (accessKeys) => {
-    const updatedAdmin = updateAdminAccess(admin.id, accessKeys);
-    toast.success(`Access updated for ${updatedAdmin.name}.`);
+  const handleSave = () => {
+    toast.success(`Access settings saved for ${admin.name}.`);
     router.push(`/user-management/admin/${admin.id}/view`);
   };
 

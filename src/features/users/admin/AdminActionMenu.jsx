@@ -10,8 +10,14 @@ import {
 import Link from "next/link";
 import { FloatingActionMenu } from "@/components/ui/FloatingActionMenu";
 
-export function AdminActionMenu({ admin, onDelete }) {
-  const isSuperAdmin = admin.role === "super_admin";
+export function AdminActionMenu({
+  admin,
+  onDelete,
+  canDelete = true,
+  isDeleting = false,
+}) {
+  const isSuperAdmin = admin.isSuperAdmin || admin.role === "super_admin";
+  const isDeleteDisabled = !canDelete || isSuperAdmin || isDeleting;
 
   const actionLinks = [
     {
@@ -58,7 +64,7 @@ export function AdminActionMenu({ admin, onDelete }) {
           <button
             type="button"
             role="menuitem"
-            disabled={isSuperAdmin}
+            disabled={isDeleteDisabled}
             onClick={() => {
               closeMenu();
               onDelete(admin);
