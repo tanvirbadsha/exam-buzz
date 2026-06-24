@@ -43,6 +43,7 @@ export const TextInput = forwardRef(
           {isPassword && (
             <button
               type="button"
+              tabIndex={-1}
               aria-label={showPassword ? "Hide password" : "Show password"}
               onClick={() => setShowPassword((visible) => !visible)}
               className="ml-2 text-muted transition-colors hover:text-foreground"

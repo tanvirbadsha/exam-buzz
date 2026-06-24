@@ -4,7 +4,12 @@ import { X } from "lucide-react";
 import { useEffect } from "react";
 import { StudentForm } from "./StudentForm";
 
-export function CreateStudentModal({ isOpen, onClose, onCreate }) {
+export function CreateStudentModal({
+  isOpen,
+  onClose,
+  onCreate,
+  isSubmitting = false,
+}) {
   useEffect(() => {
     if (!isOpen) return undefined;
 
@@ -59,15 +64,20 @@ export function CreateStudentModal({ isOpen, onClose, onCreate }) {
         <div className="p-5">
           <StudentForm
             submitLabel="Create student"
-            onSubmit={(studentInput) => {
-              onCreate(studentInput);
-              onClose();
+            isSubmitting={isSubmitting}
+            onSubmit={async (studentInput) => {
+              const created = await onCreate(studentInput);
+
+              if (created) {
+                onClose();
+              }
             }}
             secondaryAction={
               <button
                 type="button"
                 className="button button-secondary"
                 onClick={onClose}
+                disabled={isSubmitting}
               >
                 Cancel
               </button>

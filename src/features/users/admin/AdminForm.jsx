@@ -1,8 +1,7 @@
 "use client";
 
-import { AtSign, MapPin, Phone, UserRound } from "lucide-react";
+import { AtSign, LockKeyhole, Phone, UserRound } from "lucide-react";
 import { useMemo, useState } from "react";
-import { FileUpload } from "@/components/ui/forms/FileUpload";
 import { TextInput } from "@/components/ui/forms/TextInput";
 import { getRoleLabel } from "@/lib/adminData";
 
@@ -10,13 +9,13 @@ const emptyAdmin = {
   name: "",
   phone: "",
   email: "",
-  address: "",
-  imageUrl: "",
+  password: "",
+  confirmPassword: "",
   role: "sub_admin",
   accessKeys: ["dashboard"],
 };
 
-function buildErrors(form) {
+function buildErrors(form, isCreateMode) {
   const errors = {};
 
   if (!form.name.trim()) {
@@ -33,8 +32,17 @@ function buildErrors(form) {
     errors.email = { message: "Enter a valid email address." };
   }
 
-  if (!form.address.trim()) {
-    errors.address = { message: "Address is required." };
+  if (isCreateMode && !form.password.trim()) {
+    errors.password = { message: "Password is required." };
+  }
+
+  if (isCreateMode && !form.confirmPassword.trim()) {
+    errors.confirmPassword = { message: "Confirm password is required." };
+  } else if (
+    isCreateMode &&
+    form.password.trim() !== form.confirmPassword.trim()
+  ) {
+    errors.confirmPassword = { message: "Passwords do not match." };
   }
 
   return errors;
@@ -45,10 +53,17 @@ export function AdminForm({
   onSubmit,
   submitLabel = "Save admin",
   secondaryAction,
+  isSubmitting = false,
 }) {
   const initialForm = useMemo(() => ({ ...emptyAdmin, ...admin }), [admin]);
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
+  const isCreateMode = !admin;
+  const isCreatePasswordInvalid =
+    isCreateMode &&
+    (!form.password.trim() ||
+      !form.confirmPassword.trim() ||
+      form.password.trim() !== form.confirmPassword.trim());
 
   const updateField = (field, value) => {
     setForm((currentForm) => ({ ...currentForm, [field]: value }));
@@ -59,33 +74,19 @@ export function AdminForm({
     });
   };
 
-  const handleImageChange = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        updateField("imageUrl", reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
-    const nextErrors = buildErrors(form);
+    const nextErrors = buildErrors(form, isCreateMode);
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) return;
 
-    onSubmit({
-      ...form,
+    await onSubmit({
       name: form.name.trim(),
       phone: form.phone.trim(),
       email: form.email.trim(),
-      address: form.address.trim(),
+      ...(isCreateMode ? { password: form.password.trim() } : {}),
     });
   };
 
@@ -120,45 +121,59 @@ export function AdminForm({
           error={errors.email}
           placeholder="admin@example.com"
         />
-        <TextInput
-          label="Address"
-          name="address"
-          icon={MapPin}
-          value={form.address}
-          onChange={(event) => updateField("address", event.target.value)}
-          error={errors.address}
-          placeholder="City, country"
-        />
+        {isCreateMode && (
+          <>
+            <TextInput
+              label="Password"
+              name="password"
+              type="password"
+              icon={LockKeyhole}
+              value={form.password}
+              onChange={(event) => updateField("password", event.target.value)}
+              error={errors.password}
+              placeholder="Admin@12345"
+            />
+            <TextInput
+              label="Confirm password"
+              name="confirmPassword"
+              type="password"
+              icon={LockKeyhole}
+              value={form.confirmPassword}
+              onChange={(event) =>
+                updateField("confirmPassword", event.target.value)
+              }
+              error={
+                errors.confirmPassword ||
+                (form.confirmPassword &&
+                form.password.trim() !== form.confirmPassword.trim()
+                  ? { message: "Passwords do not match." }
+                  : undefined)
+              }
+              placeholder="Re-type password"
+            />
+          </>
+        )}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
-        <FileUpload
-          label="Image"
-          name="image"
-          accept=".jpg,.jpeg,.png,.webp"
-          existingUrl={form.imageUrl}
-          existingFileName={`${form.name || "Admin"} image`}
-          onChange={handleImageChange}
-          onRemoveExisting={() => updateField("imageUrl", "")}
-          uploadHint="JPG, PNG, WEBP (Max. 5MB)"
-        />
-
-        <div className="rounded-lg border border-border bg-surface-muted p-4">
-          <p className="text-sm font-semibold text-foreground">Account type</p>
-          <p className="mt-2 inline-flex rounded-full bg-brand-soft px-3 py-1 text-xs font-bold text-brand-strong">
-            {getRoleLabel(form.role)}
-          </p>
-          <p className="mt-3 text-sm leading-6 text-muted">
-            New accounts are sub admins. Menu permissions are managed from
-            access control.
-          </p>
-        </div>
+      <div className="rounded-lg border border-border bg-surface-muted p-4">
+        <p className="text-sm font-semibold text-foreground">Account type</p>
+        <p className="mt-2 inline-flex rounded-full bg-brand-soft px-3 py-1 text-xs font-bold text-brand-strong">
+          {getRoleLabel(form.role)}
+        </p>
+        <p className="mt-3 text-sm leading-6 text-muted">
+          New accounts are sub admins by default. Menu permissions are managed
+          from access control.
+        </p>
       </div>
 
       <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end">
         {secondaryAction}
-        <button type="submit" className="button button-primary">
-          {submitLabel}
+        <button
+          type="submit"
+          className="button button-primary"
+          disabled={isSubmitting || isCreatePasswordInvalid}
+        >
+          {isSubmitting ? "Saving..." : submitLabel}
         </button>
       </div>
     </form>

@@ -21,7 +21,7 @@ export function AppShell({ children }) {
     if (!shouldShowLoginToast) return;
 
     window.sessionStorage.removeItem(LOGIN_TOAST_KEY);
-    toast.success("Logged in as Super Admin.");
+    toast.success("Signed in.");
   }, [isLoginPage]);
 
   if (isLoginPage) {

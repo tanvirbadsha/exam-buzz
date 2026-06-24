@@ -11,8 +11,7 @@ export function AdminNotFound() {
         Admin not found
       </h1>
       <p className="mt-2 max-w-md text-sm leading-6 text-muted">
-        This admin record does not exist or was removed from the local admin
-        list.
+        This admin record does not exist or was removed.
       </p>
       <Link href="/user-management/admin" className="button button-primary mt-6">
         <ArrowLeft size={16} />

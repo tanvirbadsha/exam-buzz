@@ -3,29 +3,26 @@
 import { Bell, ChevronRight, LogOut, Menu, ShieldCheck, User } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useTransition } from "react";
-import { useDispatch } from "react-redux";
 import toast from "react-hot-toast";
-import { createExpiredAuthCookieValue, LOGIN_TOAST_KEY } from "@/lib/auth";
-import { logout } from "@/store/authSlice";
+import { useLogoutMutation } from "@/features/auth/api/authApi";
+import { LOGIN_TOAST_KEY } from "@/lib/auth";
 
 export function Header({ onMenuClick }) {
   const pathname = usePathname();
   const router = useRouter();
-  const dispatch = useDispatch();
-  const [isPending, startTransition] = useTransition();
+  const [logout, { isLoading }] = useLogoutMutation();
 
   const pathSegments = pathname.split("/").filter(Boolean);
 
-  const handleLogout = () => {
-    startTransition(() => {
-      document.cookie = createExpiredAuthCookieValue();
+  const handleLogout = async () => {
+    try {
+      await logout().unwrap();
+    } finally {
       window.sessionStorage.removeItem(LOGIN_TOAST_KEY);
-      dispatch(logout());
       toast.success("Signed out.");
       router.replace("/login");
       router.refresh();
-    });
+    }
   };
 
   return (
@@ -112,7 +109,7 @@ export function Header({ onMenuClick }) {
         <button
           type="button"
           onClick={handleLogout}
-          disabled={isPending}
+          disabled={isLoading}
           className="button ml-1 min-h-9 px-2.5 text-rose-500 hover:bg-rose-50 hover:text-rose-600"
           aria-label="Sign out"
         >

@@ -1,37 +1,16 @@
 "use client";
 
-/* eslint-disable react-hooks/refs */
-
 import { setupListeners } from "@reduxjs/toolkit/query";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { Provider } from "react-redux";
 import { Toaster } from "react-hot-toast";
-import { AUTH_SESSION_TOKEN, SUPER_ADMIN_USER } from "@/lib/auth";
-import { setCredentials } from "@/store/authSlice";
-import { makeStore } from "@/store/store";
+import { store } from "@/store/store";
 
-export function StoreProvider({ children, serverToken }) {
-  const storeRef = useRef(null);
-  const hydratedTokenRef = useRef(null);
-
-  if (!storeRef.current) {
-    storeRef.current = makeStore();
-  }
-
-  if (serverToken && hydratedTokenRef.current !== serverToken) {
-    storeRef.current.dispatch(
-      setCredentials({
-        token: serverToken,
-        user: serverToken === AUTH_SESSION_TOKEN ? SUPER_ADMIN_USER : null,
-      }),
-    );
-    hydratedTokenRef.current = serverToken;
-  }
-
-  useEffect(() => setupListeners(storeRef.current.dispatch), []);
+export function StoreProvider({ children }) {
+  useEffect(() => setupListeners(store.dispatch), []);
 
   return (
-    <Provider store={storeRef.current}>
+    <Provider store={store}>
       {children}
       <Toaster
         position="top-right"
