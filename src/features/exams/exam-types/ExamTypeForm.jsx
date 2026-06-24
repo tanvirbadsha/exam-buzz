@@ -34,6 +34,7 @@ export function ExamTypeForm({
   examType,
   onSubmit,
   secondaryAction,
+  isSubmitting = false,
   submitLabel = "Save exam type",
 }) {
   const initialForm = useMemo(() => buildInitialForm(examType), [examType]);
@@ -69,13 +70,7 @@ export function ExamTypeForm({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        updateField("icon", reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
+    updateField("icon", file);
   };
 
   const handleSubmit = (event) => {
@@ -88,9 +83,11 @@ export function ExamTypeForm({
 
     onSubmit({
       name: form.name.trim(),
-      icon: form.icon.trim() || null,
+      icon: form.icon || null,
     });
   };
+
+  const previewIcon = typeof form.icon === "string" ? form.icon : "";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
@@ -109,9 +106,11 @@ export function ExamTypeForm({
           label="Icon"
           name="icon"
           accept=".jpg,.jpeg,.png,.webp,.svg"
-          existingUrl={isExamTypeIconImage(form.icon) ? form.icon : ""}
+          existingUrl={isExamTypeIconImage(previewIcon) ? previewIcon : ""}
           existingFileName={
-            isExamTypeIconImage(form.icon) ? `${form.name || "Exam type"} icon` : ""
+            isExamTypeIconImage(previewIcon)
+              ? `${form.name || "Exam type"} icon`
+              : ""
           }
           uploadHint="SVG, PNG, JPG, or WebP. Max 1MB."
           onChange={handleIconChange}
@@ -122,8 +121,12 @@ export function ExamTypeForm({
 
       <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end">
         {secondaryAction}
-        <button type="submit" className="button button-primary">
-          {submitLabel}
+        <button
+          type="submit"
+          className="button button-primary"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "Saving..." : submitLabel}
         </button>
       </div>
     </form>

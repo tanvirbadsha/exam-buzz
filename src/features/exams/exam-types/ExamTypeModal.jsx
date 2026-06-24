@@ -4,7 +4,14 @@ import { X } from "lucide-react";
 import { useEffect } from "react";
 import { ExamTypeForm } from "./ExamTypeForm";
 
-export function ExamTypeModal({ examType, isOpen, mode, onClose, onSubmit }) {
+export function ExamTypeModal({
+  examType,
+  isOpen,
+  isSubmitting = false,
+  mode,
+  onClose,
+  onSubmit,
+}) {
   useEffect(() => {
     if (!isOpen) return undefined;
 
@@ -62,16 +69,20 @@ export function ExamTypeModal({ examType, isOpen, mode, onClose, onSubmit }) {
         <div className="px-5 py-5 sm:px-6 sm:py-6">
           <ExamTypeForm
             examType={examType}
+            isSubmitting={isSubmitting}
             submitLabel={submitLabel}
-            onSubmit={(examTypeInput) => {
-              onSubmit(examTypeInput);
-              onClose();
+            onSubmit={async (examTypeInput) => {
+              const result = await onSubmit(examTypeInput);
+              if (result !== false) {
+                onClose();
+              }
             }}
             secondaryAction={
               <button
                 type="button"
                 className="button button-secondary"
                 onClick={onClose}
+                disabled={isSubmitting}
               >
                 Cancel
               </button>

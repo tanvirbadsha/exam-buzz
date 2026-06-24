@@ -1,9 +1,19 @@
 "use client";
 
-import { ExamTypeForm } from "@/features/exam-types/ExamTypeForm";
-import { ExamTypeNotFound } from "@/features/exam-types/ExamTypeNotFound";
-import { useExamTypeManagement } from "@/hooks/useExamTypeManagement";
-import { DEFAULT_EXAM_TYPES_RESPONSE } from "@/lib/examTypeData";
+import { ErrorCard } from "@/components/ui/ErrorCard";
+import { GlobalSpinner } from "@/components/ui/GlobalSpinner";
+import { ExamTypeForm } from "@/features/exams/exam-types/ExamTypeForm";
+import { ExamTypeNotFound } from "@/features/exams/exam-types/ExamTypeNotFound";
+import {
+  useGetExamTypeByIdQuery,
+  useUpdateExamTypeMutation,
+} from "@/features/exams/exam-types/api/examTypes";
+import {
+  buildExamTypeUpdateFormData,
+  getExamTypeApiErrorMessage,
+  hasFormDataEntries,
+  normalizeExamType,
+} from "@/features/exams/exam-types/examTypeUtils";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -12,24 +22,54 @@ import toast from "react-hot-toast";
 export default function EditExamTypePage() {
   const { examTypeId } = useParams();
   const router = useRouter();
-  const { getExamTypeById, isLoaded, updateExamType } =
-    useExamTypeManagement(DEFAULT_EXAM_TYPES_RESPONSE.examTypes);
-  const examType = getExamTypeById(examTypeId);
+  const {
+    data,
+    error,
+    isLoading,
+    refetch,
+  } = useGetExamTypeByIdQuery(examTypeId, {
+    skip: !examTypeId,
+  });
+  const [updateExamType, { isLoading: isUpdating }] =
+    useUpdateExamTypeMutation();
+  const examType = normalizeExamType(data?.examType);
 
-  if (!isLoaded) {
+  if (isLoading) {
+    return <GlobalSpinner label="Loading exam type..." />;
+  }
+
+  if (error && !examType) {
     return (
-      <div className="mx-auto w-full max-w-4xl">
-        <div className="surface-card h-80 animate-pulse" />
-      </div>
+      <ErrorCard
+        title="Unable to load exam type"
+        message={getExamTypeApiErrorMessage(
+          error,
+          "The exam type could not be loaded.",
+        )}
+        onRetry={refetch}
+      />
     );
   }
 
   if (!examType) return <ExamTypeNotFound />;
 
-  const handleSubmit = (examTypeInput) => {
-    const updatedExamType = updateExamType(examType.id, examTypeInput);
-    toast.success(`${updatedExamType.name} updated.`);
-    router.push(`/exam-types/${examType.id}/view`);
+  const handleSubmit = async (examTypeInput) => {
+    const body = buildExamTypeUpdateFormData(examTypeInput, examType);
+
+    if (!hasFormDataEntries(body)) {
+      toast.error("No changes to save.");
+      return;
+    }
+
+    try {
+      const response = await updateExamType({ id: examType.id, body }).unwrap();
+      toast.success(`${response?.examType?.name || examTypeInput.name} updated.`);
+      router.push(`/exam-types/${examType.id}/view`);
+    } catch (updateError) {
+      toast.error(
+        getExamTypeApiErrorMessage(updateError, "Failed to update exam type."),
+      );
+    }
   };
 
   return (
@@ -50,6 +90,7 @@ export default function EditExamTypePage() {
       <section className="surface-card p-5">
         <ExamTypeForm
           examType={examType}
+          isSubmitting={isUpdating}
           submitLabel="Save changes"
           onSubmit={handleSubmit}
           secondaryAction={

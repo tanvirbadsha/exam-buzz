@@ -1,9 +1,14 @@
 "use client";
 
-import { ExamTypeNotFound } from "@/features/exam-types/ExamTypeNotFound";
-import { useExamTypeManagement } from "@/hooks/useExamTypeManagement";
+import { ErrorCard } from "@/components/ui/ErrorCard";
+import { GlobalSpinner } from "@/components/ui/GlobalSpinner";
+import { ExamTypeNotFound } from "@/features/exams/exam-types/ExamTypeNotFound";
+import { useGetExamTypeByIdQuery } from "@/features/exams/exam-types/api/examTypes";
 import {
-  DEFAULT_EXAM_TYPES_RESPONSE,
+  getExamTypeApiErrorMessage,
+  normalizeExamType,
+} from "@/features/exams/exam-types/examTypeUtils";
+import {
   formatExamTypeDate,
   isExamTypeIconImage,
 } from "@/lib/examTypeData";
@@ -25,24 +30,38 @@ function DetailRow({ label, value }) {
 
 export default function ViewExamTypePage() {
   const { examTypeId } = useParams();
-  const { getExamTypeById, isLoaded } = useExamTypeManagement(
-    DEFAULT_EXAM_TYPES_RESPONSE.examTypes,
-  );
-  const examType = getExamTypeById(examTypeId);
+  const {
+    data,
+    error,
+    isLoading,
+    refetch,
+  } = useGetExamTypeByIdQuery(examTypeId, {
+    skip: !examTypeId,
+  });
+  const examType = normalizeExamType(data?.examType);
 
-  if (!isLoaded) {
+  if (isLoading) {
+    return <GlobalSpinner label="Loading exam type..." />;
+  }
+
+  if (error && !examType) {
     return (
-      <div className="mx-auto w-full max-w-5xl">
-        <div className="surface-card h-56 animate-pulse" />
-      </div>
+      <ErrorCard
+        title="Unable to load exam type"
+        message={getExamTypeApiErrorMessage(
+          error,
+          "The exam type could not be loaded.",
+        )}
+        onRetry={refetch}
+      />
     );
   }
 
   if (!examType) return <ExamTypeNotFound />;
 
   const detailResponse = {
-    status: 200,
-    message: "Exam type retrieved successfully",
+    status: data?.status || 200,
+    message: data?.message || "Exam type retrieved successfully",
     examType,
   };
 
@@ -57,9 +76,7 @@ export default function ViewExamTypePage() {
           <h1 className="mt-3 text-2xl font-bold text-foreground sm:text-3xl">
             Exam type details
           </h1>
-          <p className="mt-2 text-sm text-muted">
-            {detailResponse.message}
-          </p>
+          <p className="mt-2 text-sm text-muted">{detailResponse.message}</p>
         </div>
         <Link
           href={`/exam-types/${examType.id}/edit`}
