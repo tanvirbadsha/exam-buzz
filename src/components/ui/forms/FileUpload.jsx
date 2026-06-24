@@ -69,6 +69,10 @@ export const FileUpload = forwardRef(
     };
 
     useEffect(() => {
+      if (inputRef.current?.files?.length) {
+        return;
+      }
+
       setPreview(existingUrl || null);
       setFileName(existingFileName || (existingUrl ? "Existing Document" : ""));
     }, [existingFileName, existingUrl]);
