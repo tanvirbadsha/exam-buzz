@@ -1,19 +1,41 @@
 import { SubjectManager } from "@/features/subjects/SubjectManager";
-import {
-  DEFAULT_EXAM_SUBJECTS,
-  DEFAULT_SUBJECT_TOPICS,
-} from "@/lib/subjectData";
+import { ssrFetch } from "@/lib/api/ssrFetch";
 
-async function getSubjects() {
-  // Replace this mock with the subjects API call when the endpoint is ready.
+const FIRST_SUBJECT_PAGE = 1;
+const SUBJECT_PAGE_LIMIT = 10;
+
+function emptySubjectResponse(message) {
   return {
-    subjects: DEFAULT_EXAM_SUBJECTS,
-    topics: DEFAULT_SUBJECT_TOPICS,
+    status: 500,
+    message,
+    subjects: [],
+    pagination: {
+      total: 0,
+      page: FIRST_SUBJECT_PAGE,
+      limit: SUBJECT_PAGE_LIMIT,
+      totalPages: 0,
+    },
+    _error: true,
   };
 }
 
-export default async function SubjectsPage() {
-  const { subjects, topics } = await getSubjects();
+async function getInitialSubjects() {
+  const params = new URLSearchParams({
+    page: String(FIRST_SUBJECT_PAGE),
+    limit: String(SUBJECT_PAGE_LIMIT),
+  });
 
-  return <SubjectManager initialSubjects={subjects} initialTopics={topics} />;
+  try {
+    return await ssrFetch(`/exam/subjects/get-all-subjects?${params}`);
+  } catch (error) {
+    return emptySubjectResponse(
+      error?.message || "Unable to load subjects.",
+    );
+  }
+}
+
+export default async function SubjectsPage() {
+  const initialData = await getInitialSubjects();
+
+  return <SubjectManager initialData={initialData} />;
 }

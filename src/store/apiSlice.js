@@ -1,10 +1,10 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-import { clearCredentials } from "@/store/authSlice";
 import {
   AUTH_TOKEN_COOKIE_NAME,
   AUTH_TOKEN_STORAGE_KEY,
   ROLE_COOKIE_NAME,
 } from "@/lib/auth/constants";
+import { clearCredentials } from "@/store/authSlice";
+import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
 const baseQuery = fetchBaseQuery({
   baseUrl: process.env.NEXT_PUBLIC_BASE_URL,
@@ -53,6 +53,6 @@ async function baseQueryWithAuthGuard(args, api, extraOptions) {
 export const apiSlice = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithAuthGuard,
-  tagTypes: ["User", "Topic"],
+  tagTypes: ["User", "Topic", "Subject"],
   endpoints: () => ({}),
 });

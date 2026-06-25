@@ -1,5 +1,10 @@
 "use client";
 
+import { ErrorCard } from "@/components/ui/ErrorCard";
+import { FloatingActionMenu } from "@/components/ui/FloatingActionMenu";
+import { GlobalSpinner } from "@/components/ui/GlobalSpinner";
+import { Pagination } from "@/components/ui/Pagination";
+import { StatusToggle } from "@/components/ui/StatusToggle";
 import {
   Table,
   TableBody,
@@ -10,53 +15,71 @@ import {
   TableTd,
   TableTh,
 } from "@/components/ui/CustomTable";
-import { FloatingActionMenu } from "@/components/ui/FloatingActionMenu";
 import { CustomDropdown } from "@/components/ui/forms/CustomDropdown";
-import { StatusToggle } from "@/components/ui/StatusToggle";
-import { useSubjectManagement } from "@/hooks/useSubjectManagement";
+import {
+  subjectsApi,
+  useCreateSubjectMutation,
+  useDeleteSubjectMutation,
+  useGetAllSubjectQuery,
+  useGetSubjectByIdQuery,
+  useUpdateSubjectMutation,
+  useUpdateSubjectStatusMutation,
+} from "@/features/subjects/api/subjectsApi";
 import { SUBJECT_STATUS_OPTIONS } from "@/lib/subjectData";
 import {
   ArrowLeft,
-  BookMarked,
   ChevronRight,
   Eye,
-  Layers,
   Pencil,
   Plus,
   RotateCcw,
   Search,
   Trash2,
 } from "lucide-react";
-import { useDeferredValue, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import { useDispatch } from "react-redux";
 import { ROOT_SUBJECT_VALUE } from "./SubjectForm";
 import { SubjectDetailModal } from "./SubjectDetailModal";
-import { isUploadedSubjectIcon, SubjectIcon } from "./SubjectIcon";
+import { SubjectIcon } from "./SubjectIcon";
 import { SubjectModal } from "./SubjectModal";
-import { TopicModal } from "./TopicModal";
+import {
+  buildSubjectCreateFormData,
+  buildSubjectUpdateFormData,
+  getApiErrorMessage,
+  getDirectChildCount,
+  getSubjectChildrenCount,
+  getSubjectPagination,
+  normalizeSubject,
+  normalizeSubjects,
+} from "./subjectUtils";
 
-function SubjectActionMenu({
-  onAddTopics,
-  onDelete,
-  onEdit,
-  onView,
-  subject,
-}) {
+const SUBJECT_PAGE_LIMIT = 10;
+const INITIAL_QUERY_ARGS = {
+  search: "",
+  page: 1,
+  limit: SUBJECT_PAGE_LIMIT,
+  parentID: undefined,
+  status: undefined,
+};
+
+function SubjectActionMenu({ disabled, onDelete, onEdit, onView, subject }) {
   return (
     <FloatingActionMenu
       ariaLabel={`Open actions for ${subject.name}`}
-      menuHeight={184}
+      menuHeight={144}
     >
       {({ closeMenu }) => (
         <>
           <button
             type="button"
             role="menuitem"
+            disabled={disabled}
             onClick={() => {
               closeMenu();
               onView(subject);
             }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-surface-muted"
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-surface-muted disabled:pointer-events-none disabled:opacity-50"
           >
             <Eye size={15} className="text-muted" />
             View
@@ -64,23 +87,12 @@ function SubjectActionMenu({
           <button
             type="button"
             role="menuitem"
-            onClick={() => {
-              closeMenu();
-              onAddTopics(subject);
-            }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-surface-muted"
-          >
-            <Plus size={15} className="text-muted" />
-            Add topics
-          </button>
-          <button
-            type="button"
-            role="menuitem"
+            disabled={disabled}
             onClick={() => {
               closeMenu();
               onEdit(subject);
             }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-surface-muted"
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-surface-muted disabled:pointer-events-none disabled:opacity-50"
           >
             <Pencil size={15} className="text-muted" />
             Edit
@@ -88,11 +100,12 @@ function SubjectActionMenu({
           <button
             type="button"
             role="menuitem"
+            disabled={disabled}
             onClick={() => {
               closeMenu();
               onDelete(subject);
             }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-danger transition-colors hover:bg-rose-50"
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-danger transition-colors hover:bg-rose-50 disabled:pointer-events-none disabled:opacity-50"
           >
             <Trash2 size={15} />
             Delete
@@ -103,42 +116,10 @@ function SubjectActionMenu({
   );
 }
 
-function TopicActionMenu({ onDelete, onEdit, topic }) {
-  return (
-    <FloatingActionMenu
-      ariaLabel={`Open actions for ${topic.name}`}
-      menuHeight={96}
-    >
-      {({ closeMenu }) => (
-        <>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              closeMenu();
-              onEdit(topic);
-            }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-surface-muted"
-          >
-            <Pencil size={15} className="text-muted" />
-            Edit
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              closeMenu();
-              onDelete(topic);
-            }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-danger transition-colors hover:bg-rose-50"
-          >
-            <Trash2 size={15} />
-            Delete
-          </button>
-        </>
-      )}
-    </FloatingActionMenu>
-  );
+function statusFilterToApiValue(statusFilter) {
+  if (statusFilter === "active") return true;
+  if (statusFilter === "inactive") return false;
+  return undefined;
 }
 
 function sortByName(items) {
@@ -147,15 +128,53 @@ function sortByName(items) {
   );
 }
 
-function buildParentOptions(childrenMap, excludedIds = new Set()) {
-  const options = [];
+function mergeSubjects(...subjectLists) {
+  const subjectsById = new Map();
 
-  const walk = (parentId = "root", depth = 0, parentPath = []) => {
-    const children = sortByName(childrenMap.get(parentId) || []);
+  subjectLists.flat().forEach((subject) => {
+    if (!subject?.id || subjectsById.has(String(subject.id))) return;
+    subjectsById.set(String(subject.id), subject);
+  });
+
+  return Array.from(subjectsById.values());
+}
+
+function buildChildrenMap(subjects) {
+  const childrenMap = new Map();
+
+  subjects.forEach((subject) => {
+    const parentKey = subject.parentId ? String(subject.parentId) : "root";
+    const children = childrenMap.get(parentKey) || [];
+    children.push(subject);
+    childrenMap.set(parentKey, children);
+  });
+
+  return childrenMap;
+}
+
+function addDescendantIds(childrenMap, subjectId, excludedIds) {
+  const children = childrenMap.get(String(subjectId)) || [];
+
+  children.forEach((childSubject) => {
+    const childId = String(childSubject.id);
+    excludedIds.add(childId);
+    addDescendantIds(childrenMap, childId, excludedIds);
+  });
+}
+
+function buildParentOptions(subjects, excludedIds = new Set()) {
+  const options = [];
+  const childrenMap = buildChildrenMap(subjects);
+  const visitedIds = new Set();
+
+  const walk = (parentKey = "root", depth = 0, parentPath = []) => {
+    const children = sortByName(childrenMap.get(parentKey) || []);
 
     children.forEach((subject) => {
-      if (excludedIds.has(subject.id)) return;
+      const subjectId = String(subject.id);
+      if (visitedIds.has(subjectId) || excludedIds.has(subjectId)) return;
 
+      visitedIds.add(subjectId);
       const path = [...parentPath, subject.name];
       options.push({
         label: subject.name,
@@ -164,135 +183,187 @@ function buildParentOptions(childrenMap, excludedIds = new Set()) {
         meta: path.join(" / "),
         searchText: path.join(" "),
       });
-      walk(subject.id, depth + 1, path);
+      walk(subjectId, depth + 1, path);
     });
   };
 
   walk();
+
+  sortByName(subjects).forEach((subject) => {
+    const subjectId = String(subject.id);
+    if (visitedIds.has(subjectId) || excludedIds.has(subjectId)) return;
+
+    visitedIds.add(subjectId);
+    options.push({
+      label: subject.name,
+      value: subject.id,
+      depth: 0,
+      meta: subject.name,
+      searchText: subject.name,
+    });
+  });
+
   return options;
 }
 
-function getSubjectPath(subjectsById, subjectId) {
-  const path = [];
-  const visitedIds = new Set();
-  let subject = subjectsById.get(subjectId);
-
-  while (subject && !visitedIds.has(subject.id)) {
-    path.unshift(subject);
-    visitedIds.add(subject.id);
-    subject = subject.parentId ? subjectsById.get(subject.parentId) : null;
-  }
-
-  return path;
-}
-
-export function SubjectManager({ initialSubjects, initialTopics }) {
-  const {
-    createSubject,
-    createTopics,
-    deleteSubject,
-    deleteTopic,
-    subjectIndex,
-    topicsBySubjectId,
-    totals,
-    updateSubject,
-    updateSubjectStatus,
-    updateTopic,
-    updateTopicStatus,
-  } = useSubjectManagement(initialSubjects, initialTopics);
-  const [selectedParentId, setSelectedParentId] = useState(null);
-  const [selectedTopicSubjectId, setSelectedTopicSubjectId] = useState(null);
+export function SubjectManager({ initialData }) {
+  const dispatch = useDispatch();
+  const [selectedParentStack, setSelectedParentStack] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
   const [subjectModalState, setSubjectModalState] = useState({
     isOpen: false,
     mode: "create",
     subject: null,
   });
-  const [topicModalState, setTopicModalState] = useState({
-    isOpen: false,
-    mode: "create",
-    subject: null,
-    topic: null,
-  });
-  const [viewSubject, setViewSubject] = useState(null);
-  const topicsTableRef = useRef(null);
-  const deferredSearchQuery = useDeferredValue(searchQuery);
-
-  const selectedSubject =
-    selectedParentId && subjectIndex.subjectsById.has(selectedParentId)
-      ? subjectIndex.subjectsById.get(selectedParentId)
+  const [viewSubjectFallback, setViewSubjectFallback] = useState(null);
+  const [hasHydratedInitialData, setHasHydratedInitialData] = useState(
+    () => !initialData || Boolean(initialData._error),
+  );
+  const deferredSearchQuery = useDeferredValue(searchQuery.trim());
+  const selectedParent =
+    selectedParentStack.length > 0
+      ? selectedParentStack[selectedParentStack.length - 1]
       : null;
-  const selectedTopicSubject =
-    selectedTopicSubjectId && subjectIndex.subjectsById.has(selectedTopicSubjectId)
-      ? subjectIndex.subjectsById.get(selectedTopicSubjectId)
-      : selectedSubject;
-  const currentParentKey = selectedSubject?.id || "root";
-  const currentSubjects = useMemo(
-    () => sortByName(subjectIndex.childrenMap.get(currentParentKey) || []),
-    [currentParentKey, subjectIndex.childrenMap],
+  const selectedParentId = selectedParent?.id ?? null;
+
+  useEffect(() => {
+    if (!initialData || initialData._error) return;
+
+    dispatch(
+      subjectsApi.util.upsertQueryData(
+        "getAllSubject",
+        INITIAL_QUERY_ARGS,
+        initialData,
+      ),
+    );
+    queueMicrotask(() => setHasHydratedInitialData(true));
+  }, [dispatch, initialData]);
+
+  const queryArgs = useMemo(
+    () => ({
+      search: deferredSearchQuery,
+      page,
+      limit: SUBJECT_PAGE_LIMIT,
+      parentID: selectedParentId ?? undefined,
+      status: statusFilterToApiValue(statusFilter),
+    }),
+    [deferredSearchQuery, page, selectedParentId, statusFilter],
   );
-  const breadcrumbSubjects = useMemo(
+
+  const shouldUseInitialData =
+    !hasHydratedInitialData &&
+    page === 1 &&
+    deferredSearchQuery === "" &&
+    statusFilter === "all" &&
+    !selectedParentId &&
+    Boolean(initialData) &&
+    !initialData?._error;
+
+  const {
+    data: queryData,
+    error,
+    isLoading,
+    isFetching,
+    refetch,
+  } = useGetAllSubjectQuery(queryArgs, {
+    skip: shouldUseInitialData,
+    placeholderData: shouldUseInitialData ? initialData : undefined,
+  });
+  const { data: parentOptionsData } = useGetAllSubjectQuery({
+    page: 1,
+    limit: 1000,
+  });
+  const [createSubject, { isLoading: isCreating }] =
+    useCreateSubjectMutation();
+  const [updateSubject, { isLoading: isUpdating }] =
+    useUpdateSubjectMutation();
+  const [updateSubjectStatus, { isLoading: isUpdatingStatus }] =
+    useUpdateSubjectStatusMutation();
+  const [deleteSubject, { isLoading: isDeleting }] =
+    useDeleteSubjectMutation();
+
+  const data = shouldUseInitialData ? initialData : queryData;
+  const fetchedSubjects = useMemo(
+    () => sortByName(normalizeSubjects(data?.subjects)),
+    [data],
+  );
+  const parentOptionSubjects = useMemo(
     () =>
-      selectedSubject
-        ? getSubjectPath(subjectIndex.subjectsById, selectedSubject.id)
-        : [],
-    [selectedSubject, subjectIndex.subjectsById],
+      mergeSubjects(
+        normalizeSubjects(parentOptionsData?.subjects),
+        fetchedSubjects,
+        selectedParentStack,
+      ),
+    [fetchedSubjects, parentOptionsData, selectedParentStack],
   );
-  const selectedSubjectTopics = useMemo(
-    () =>
-      selectedTopicSubject
-        ? sortByName(topicsBySubjectId.get(selectedTopicSubject.id) || [])
-        : [],
-    [selectedTopicSubject, topicsBySubjectId],
-  );
-
-  const filteredSubjects = useMemo(() => {
-    const query = deferredSearchQuery.trim().toLowerCase();
-
-    return currentSubjects.filter((subject) => {
-      const searchableIcon = isUploadedSubjectIcon(subject.icon)
-        ? ""
-        : subject.icon;
-      const matchesSearch =
-        !query ||
-        [subject.name, searchableIcon].join(" ").toLowerCase().includes(query);
-      const matchesStatus =
-        statusFilter === "all" || subject.status === statusFilter;
-
-      return matchesSearch && matchesStatus;
-    });
-  }, [currentSubjects, deferredSearchQuery, statusFilter]);
-
-  const parentOptions = useMemo(() => {
-    const excludedIds = new Set();
-
-    if (subjectModalState.mode === "edit" && subjectModalState.subject) {
-      excludedIds.add(subjectModalState.subject.id);
-      subjectIndex.descendantCounts.forEach((_, subjectId) => {
-        const path = getSubjectPath(subjectIndex.subjectsById, subjectId);
-        const isDescendant = path.some(
-          (pathSubject) => pathSubject.id === subjectModalState.subject.id,
-        );
-
-        if (isDescendant && subjectId !== subjectModalState.subject.id) {
-          excludedIds.add(subjectId);
-        }
-      });
+  const subjects = useMemo(() => {
+    if (selectedParentId) {
+      return fetchedSubjects.filter(
+        (subject) => String(subject.parentId ?? "") === String(selectedParentId),
+      );
     }
 
-    return buildParentOptions(subjectIndex.childrenMap, excludedIds);
-  }, [
-    subjectIndex.childrenMap,
-    subjectIndex.descendantCounts,
-    subjectIndex.subjectsById,
-    subjectModalState.mode,
-    subjectModalState.subject,
-  ]);
+    return fetchedSubjects.filter((subject) => !subject.parentId);
+  }, [fetchedSubjects, selectedParentId]);
+  const pagination = selectedParentId
+    ? getSubjectPagination(data, page, SUBJECT_PAGE_LIMIT)
+    : getSubjectPagination(
+        { ...data, subjects, total: subjects.length },
+        page,
+        SUBJECT_PAGE_LIMIT,
+      );
+  const pageStart =
+    pagination.total > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0;
+  const pageEnd = Math.min(pagination.page * pagination.limit, pagination.total);
+  const parentOptions = useMemo(() => {
+    const excludedIds = new Set();
+    const childrenMap = buildChildrenMap(parentOptionSubjects);
+
+    if (subjectModalState.mode === "edit" && subjectModalState.subject) {
+      const subjectId = String(subjectModalState.subject.id);
+      excludedIds.add(subjectId);
+      addDescendantIds(childrenMap, subjectId, excludedIds);
+    }
+
+    return buildParentOptions(parentOptionSubjects, excludedIds);
+  }, [parentOptionSubjects, subjectModalState.mode, subjectModalState.subject]);
+  const viewSubjectId = viewSubjectFallback?.id;
+  const {
+    data: detailData,
+    error: detailError,
+    isFetching: isFetchingDetails,
+  } = useGetSubjectByIdQuery(viewSubjectId, {
+    skip: !viewSubjectId,
+  });
+  const detailSubject =
+    normalizeSubject(detailData?.subject) || viewSubjectFallback;
+  const detailParent =
+    normalizeSubject(detailData?.subject?.parent) ||
+    (detailSubject?.parentId === selectedParentId ? selectedParent : null);
+  const childCount = getSubjectChildrenCount(detailSubject);
+  const initialError = initialData?._error && !queryData ? initialData : null;
+  const activeError = error || initialError;
+  const isBusy =
+    isCreating || isUpdating || isUpdatingStatus || isDeleting || isFetchingDetails;
+
+  useEffect(() => {
+    if (!detailError) return;
+    toast.error(
+      getApiErrorMessage(detailError, "Subject details could not be loaded."),
+    );
+  }, [detailError]);
+
+  const handleSearchChange = (event) => {
+    setSearchQuery(event.target.value);
+    setPage(1);
+  };
 
   const resetFilters = () => {
     setSearchQuery("");
     setStatusFilter("all");
+    setPage(1);
   };
 
   const openCreateSubjectModal = () => {
@@ -310,133 +381,129 @@ export function SubjectManager({ initialSubjects, initialTopics }) {
     }));
   };
 
-  const openCreateTopicModal = (subject) => {
-    setTopicModalState({ isOpen: true, mode: "create", subject, topic: null });
-  };
-
-  const openEditTopicModal = (topic) => {
-    setTopicModalState({
-      isOpen: true,
-      mode: "edit",
-      subject: selectedTopicSubject,
-      topic,
-    });
-  };
-
-  const closeTopicModal = () => {
-    setTopicModalState((currentState) => ({ ...currentState, isOpen: false }));
-  };
-
   const drillIntoSubject = (subject) => {
-    setSelectedParentId(subject.id);
-    setSelectedTopicSubjectId(subject.id);
+    setSelectedParentStack((currentStack) => [...currentStack, subject]);
+    setPage(1);
     resetFilters();
   };
 
-  const showSubjectTopics = (subject) => {
-    setSelectedTopicSubjectId(subject.id);
-    requestAnimationFrame(() => {
-      topicsTableRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    });
+  const goToRoot = () => {
+    setSelectedParentStack([]);
+    resetFilters();
   };
 
-  const handleSubjectSubmit = (subjectInput) => {
+  const goToBreadcrumb = (subjectIndex) => {
+    setSelectedParentStack((currentStack) =>
+      currentStack.slice(0, subjectIndex + 1),
+    );
+    resetFilters();
+  };
+
+  const goBackOneLevel = () => {
+    setSelectedParentStack((currentStack) => currentStack.slice(0, -1));
+    resetFilters();
+  };
+
+  const handleSubjectSubmit = async (subjectInput) => {
     if (subjectModalState.mode === "edit" && subjectModalState.subject) {
-      const updatedSubject = updateSubject(
-        subjectModalState.subject.id,
+      const formData = buildSubjectUpdateFormData(
         subjectInput,
+        subjectModalState.subject,
       );
-      if (updatedSubject) {
-        toast.success(`${updatedSubject.name} updated.`);
+
+      if (Array.from(formData.keys()).length === 0) {
+        toast.success("No subject changes to save.");
+        return true;
       }
-      return;
+
+      try {
+        const response = await updateSubject({
+          id: subjectModalState.subject.id,
+          body: formData,
+        }).unwrap();
+        toast.success(
+          `${response?.subject?.name || subjectInput.name} updated.`,
+        );
+        return true;
+      } catch (updateError) {
+        toast.error(
+          getApiErrorMessage(updateError, "Failed to update subject."),
+        );
+        return false;
+      }
     }
 
-    const createdSubject = createSubject(subjectInput);
-    toast.success(`${createdSubject.name} created.`);
+    try {
+      const response = await createSubject(
+        buildSubjectCreateFormData(subjectInput),
+      ).unwrap();
+      toast.success(`${response?.subject?.name || subjectInput.name} created.`);
+      setPage(1);
+      return true;
+    } catch (createError) {
+      toast.error(getApiErrorMessage(createError, "Failed to create subject."));
+      return false;
+    }
   };
 
-  const handleSubjectDelete = (subject) => {
-    const descendantCount = subjectIndex.descendantCounts.get(subject.id) || 0;
-    const topicCount = subjectIndex.topicCounts.get(subject.id) || 0;
+  const handleSubjectDelete = async (subject) => {
+    const childSubjectCount = getSubjectChildrenCount(subject);
     const confirmed = window.confirm(
-      descendantCount > 0 || topicCount > 0
-        ? `Delete ${subject.name}, ${descendantCount} nested subject${descendantCount === 1 ? "" : "s"}, and related topics?`
+      childSubjectCount > 0
+        ? `Delete ${subject.name} and ${childSubjectCount} nested subject${childSubjectCount === 1 ? "" : "s"}?`
         : `Delete ${subject.name}?`,
     );
     if (!confirmed) return;
 
-    const result = deleteSubject(subject.id);
-    if (!result) {
-      toast.error("Subject could not be deleted.");
-      return;
-    }
+    try {
+      await deleteSubject(subject.id).unwrap();
+      toast.success(`${subject.name} deleted.`);
 
-    toast.success(
-      result.deletedCount > 1
-        ? `${result.deletedCount} subjects deleted.`
-        : `${subject.name} deleted.`,
-    );
-    resetFilters();
-  };
-
-  const handleSubjectStatusChange = (subject, checked) => {
-    const status = checked ? "active" : "inactive";
-    const updatedSubject = updateSubjectStatus(subject.id, status);
-    if (updatedSubject) {
-      toast.success(`${updatedSubject.name} marked ${status}.`);
-    }
-  };
-
-  const handleTopicSubmit = (topicRows) => {
-    if (!topicModalState.subject) return;
-
-    if (topicModalState.mode === "edit" && topicModalState.topic) {
-      const updatedTopic = updateTopic(topicModalState.topic.id, topicRows[0]);
-      if (updatedTopic) {
-        toast.success(`${updatedTopic.name} updated.`);
+      if (subjects.length === 1 && page > 1) {
+        setPage((currentPage) => Math.max(1, currentPage - 1));
       }
-      return;
+    } catch (deleteError) {
+      toast.error(getApiErrorMessage(deleteError, "Failed to delete subject."));
     }
+  };
 
-    const createdTopics = createTopics(topicModalState.subject.id, topicRows);
-    toast.success(
-      createdTopics.length === 1
-        ? `${createdTopics[0].name} created.`
-        : `${createdTopics.length} topics created.`,
+  const handleSubjectStatusChange = async (subject, checked) => {
+    try {
+      await updateSubjectStatus({
+        id: subject.id,
+        status: String(checked),
+      }).unwrap();
+      toast.success(`${subject.name} status updated.`);
+    } catch (statusError) {
+      toast.error(
+        getApiErrorMessage(statusError, "Failed to update subject status."),
+      );
+    }
+  };
+
+  if ((isLoading || !hasHydratedInitialData) && !data && !activeError) {
+    return <GlobalSpinner label="Loading subjects..." />;
+  }
+
+  if (activeError && !data?.subjects?.length) {
+    return (
+      <ErrorCard
+        title="Unable to load subjects"
+        message={getApiErrorMessage(
+          activeError,
+          "The subject list could not be loaded.",
+        )}
+        onRetry={error ? refetch : undefined}
+      />
     );
-  };
+  }
 
-  const handleTopicDelete = (topic) => {
-    const confirmed = window.confirm(`Delete ${topic.name}?`);
-    if (!confirmed) return;
-
-    const deleted = deleteTopic(topic.id);
-    if (deleted) {
-      toast.success(`${deleted.name} deleted.`);
-    }
-  };
-
-  const handleTopicStatusChange = (topic, checked) => {
-    const status = checked ? "active" : "inactive";
-    const updatedTopic = updateTopicStatus(topic.id, status);
-    if (updatedTopic) {
-      toast.success(`${updatedTopic.name} marked ${status}.`);
-    }
-  };
-
-  const showParentColumn = Boolean(selectedSubject);
-  const tableTitle = selectedSubject ? selectedSubject.name : "Subjects";
-  const tableSummary = `${filteredSubjects.length} of ${currentSubjects.length} ${
-    selectedSubject ? "direct sub-subjects" : "main subjects"
-  } shown`;
+  const showParentColumn = Boolean(selectedParent);
+  const tableTitle = selectedParent ? selectedParent.name : "Subjects";
+  const tableSummary = `Showing ${pageStart}-${pageEnd} of ${pagination.total} ${
+    selectedParent ? "direct sub-subjects" : "subjects"
+  }`;
   const emptyTableColSpan = showParentColumn ? 7 : 6;
-  const viewedParent = viewSubject?.parentId
-    ? subjectIndex.subjectsById.get(viewSubject.parentId)
-    : null;
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
@@ -449,41 +516,33 @@ export function SubjectManager({ initialSubjects, initialTopics }) {
             Subject hierarchy
           </h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-            Create subjects, nest sub-subjects under any parent, and add one or
-            many topics to the selected subject level.
+            Create subjects, nest sub-subjects under any parent, and manage
+            active status from the subject list.
           </p>
         </div>
 
-        <div className="grid grid-cols-4 overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
+        <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
           <div className="border-r border-border px-4 py-3">
-            <p className="text-xs font-semibold text-muted">Total</p>
+            <p className="text-xs font-semibold text-muted">Listed</p>
             <p className="mt-1 text-xl font-black text-foreground">
-              {totals.total}
+              {pagination.total}
             </p>
           </div>
           <div className="border-r border-border px-4 py-3">
-            <p className="text-xs font-semibold text-muted">Main</p>
+            <p className="text-xs font-semibold text-muted">Page</p>
             <p className="mt-1 text-xl font-black text-foreground">
-              {totals.root}
-            </p>
-          </div>
-          <div className="border-r border-border px-4 py-3">
-            <p className="text-xs font-semibold text-muted">Topics</p>
-            <p className="mt-1 text-xl font-black text-foreground">
-              {totals.topics}
+              {pagination.page}
             </p>
           </div>
           <div className="px-4 py-3">
-            <p className="text-xs font-semibold text-muted">Active</p>
-            <p className="mt-1 text-xl font-black text-foreground">
-              {totals.active}
-            </p>
+            <p className="text-xs font-semibold text-muted">Topics</p>
+            <p className="mt-1 text-xl font-black text-foreground">0</p>
           </div>
         </div>
       </section>
 
       <section className="surface-card p-4">
-        <div className="grid gap-3 lg:grid-cols-[minmax(18rem,1fr)_14rem_auto_auto_auto] lg:items-end">
+        <div className="grid gap-3 lg:grid-cols-[minmax(18rem,1fr)_14rem_auto_auto] lg:items-end">
           <label className="field-group">
             <span className="field-label">Search current level</span>
             <span className="field-shell px-3">
@@ -491,9 +550,9 @@ export function SubjectManager({ initialSubjects, initialTopics }) {
               <input
                 type="search"
                 value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
+                onChange={handleSearchChange}
                 className="field-input"
-                placeholder="Search name or icon..."
+                placeholder="Search subjects..."
                 aria-label="Search subjects"
               />
             </span>
@@ -503,7 +562,10 @@ export function SubjectManager({ initialSubjects, initialTopics }) {
             label="Status"
             options={SUBJECT_STATUS_OPTIONS}
             value={statusFilter}
-            onChange={(option) => setStatusFilter(option.value)}
+            onChange={(option) => {
+              setStatusFilter(option.value);
+              setPage(1);
+            }}
             placeholder="All statuses"
           />
 
@@ -515,23 +577,13 @@ export function SubjectManager({ initialSubjects, initialTopics }) {
             <RotateCcw size={15} />
             Reset
           </button>
-          {selectedSubject && (
-            <button
-              type="button"
-              className="button button-secondary min-h-11"
-              onClick={() => openCreateTopicModal(selectedTopicSubject)}
-            >
-              <Plus size={16} />
-              Add topics
-            </button>
-          )}
           <button
             type="button"
             className="button button-primary min-h-11"
             onClick={openCreateSubjectModal}
           >
             <Plus size={16} />
-            {selectedSubject ? "Create sub-subject" : "Create subject"}
+            {selectedParent ? "Create sub-subject" : "Create subject"}
           </button>
         </div>
       </section>
@@ -539,20 +591,16 @@ export function SubjectManager({ initialSubjects, initialTopics }) {
       <TableContainer>
         <div className="flex flex-col gap-3 border-b border-border px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
-            {selectedSubject ? (
+            {selectedParent ? (
               <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm font-semibold text-muted">
                 <button
                   type="button"
                   className="rounded-md px-2 py-1 text-brand-strong transition-colors hover:bg-brand-soft"
-                  onClick={() => {
-                    setSelectedParentId(null);
-                    setSelectedTopicSubjectId(null);
-                    resetFilters();
-                  }}
+                  onClick={goToRoot}
                 >
                   Subjects
                 </button>
-                {breadcrumbSubjects.map((subject) => (
+                {selectedParentStack.map((subject, index) => (
                   <span
                     key={subject.id}
                     className="inline-flex min-w-0 items-center gap-2"
@@ -561,15 +609,11 @@ export function SubjectManager({ initialSubjects, initialTopics }) {
                     <button
                       type="button"
                       className={`max-w-44 truncate rounded-md px-2 py-1 transition-colors ${
-                        subject.id === selectedSubject?.id
+                        subject.id === selectedParent?.id
                           ? "bg-brand-soft text-brand-strong"
                           : "text-brand-strong hover:bg-brand-soft"
                       }`}
-                      onClick={() => {
-                        setSelectedParentId(subject.id);
-                        setSelectedTopicSubjectId(subject.id);
-                        resetFilters();
-                      }}
+                      onClick={() => goToBreadcrumb(index)}
                     >
                       {subject.name}
                     </button>
@@ -581,25 +625,31 @@ export function SubjectManager({ initialSubjects, initialTopics }) {
                 {tableTitle}
               </h2>
             )}
-            {selectedSubject && <h2 className="sr-only">{tableTitle}</h2>}
+            {selectedParent && <h2 className="sr-only">{tableTitle}</h2>}
             <p className="text-sm text-muted">{tableSummary}</p>
           </div>
 
-          {selectedSubject && (
-            <button
-              type="button"
-              className="button button-secondary"
-              onClick={() => {
-                const parentId = selectedSubject.parentId || null;
-                setSelectedParentId(parentId);
-                setSelectedTopicSubjectId(parentId);
-                resetFilters();
-              }}
-            >
-              <ArrowLeft size={16} />
-              Back one level
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            <div className="flex h-10 min-w-28 items-center justify-end">
+              {isFetching && !isLoading && (
+                <GlobalSpinner
+                  label="Refreshing..."
+                  compact
+                  className="h-10 py-0"
+                />
+              )}
+            </div>
+            {selectedParent && (
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={goBackOneLevel}
+              >
+                <ArrowLeft size={16} />
+                Back one level
+              </button>
+            )}
+          </div>
         </div>
 
         <TableResponsive>
@@ -616,21 +666,20 @@ export function SubjectManager({ initialSubjects, initialTopics }) {
               </tr>
             </TableHead>
             <TableBody>
-              {filteredSubjects.length > 0 ? (
-                filteredSubjects.map((subject, index) => {
-                  const directChildCount =
-                    subjectIndex.directChildCounts.get(subject.id) || 0;
-                  const topicCount =
-                    subjectIndex.topicCounts.get(subject.id) || 0;
-                  const parent =
-                    showParentColumn && subject.parentId
-                      ? subjectIndex.subjectsById.get(subject.parentId)
-                      : null;
+              {subjects.length > 0 ? (
+                subjects.map((subject, index) => {
+                  const directChildCount = getDirectChildCount(
+                    subject,
+                    parentOptionSubjects,
+                  );
+                  const parent = selectedParent || normalizeSubject(subject.parent);
 
                   return (
                     <TableRow key={subject.id}>
                       <TableTd className="font-mono text-xs text-muted">
-                        {String(index + 1).padStart(2, "0")}
+                        {String(
+                          (page - 1) * SUBJECT_PAGE_LIMIT + index + 1,
+                        ).padStart(2, "0")}
                       </TableTd>
                       <TableTd>
                         <div className="flex min-w-72 items-start gap-3">
@@ -640,9 +689,13 @@ export function SubjectManager({ initialSubjects, initialTopics }) {
                             className="mt-0.5 h-9 w-9 text-xs"
                           />
                           <div className="min-w-0">
-                            <p className="font-semibold text-foreground">
+                            <button
+                              type="button"
+                              className="text-left font-semibold text-foreground transition-colors hover:text-brand-strong"
+                              onClick={() => drillIntoSubject(subject)}
+                            >
                               {subject.name}
-                            </p>
+                            </button>
                             <p className="mt-1 text-xs font-medium text-muted">
                               {subject.parentId
                                 ? "Sub-subject"
@@ -673,24 +726,14 @@ export function SubjectManager({ initialSubjects, initialTopics }) {
                         )}
                       </TableTd>
                       <TableTd>
-                        {topicCount > 0 ? (
-                          <button
-                            type="button"
-                            className="inline-flex min-h-9 min-w-12 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 px-3 text-sm font-black text-emerald-700 transition-colors hover:border-emerald-300 hover:bg-white"
-                            onClick={() => showSubjectTopics(subject)}
-                            aria-label={`Show ${topicCount} topics of ${subject.name}`}
-                          >
-                            {topicCount}
-                          </button>
-                        ) : (
-                          <span className="inline-flex min-h-9 min-w-12 items-center justify-center rounded-lg border border-border bg-surface-muted px-3 text-sm font-bold text-muted">
-                            0
-                          </span>
-                        )}
+                        <span className="inline-flex min-h-9 min-w-12 items-center justify-center rounded-lg border border-border bg-surface-muted px-3 text-sm font-bold text-muted">
+                          0
+                        </span>
                       </TableTd>
                       <TableTd>
                         <StatusToggle
                           checked={subject.status === "active"}
+                          disabled={isUpdatingStatus}
                           label={`Set ${subject.name} active status`}
                           onChange={(checked) =>
                             handleSubjectStatusChange(subject, checked)
@@ -699,11 +742,11 @@ export function SubjectManager({ initialSubjects, initialTopics }) {
                       </TableTd>
                       <TableTd>
                         <SubjectActionMenu
+                          disabled={isBusy}
                           subject={subject}
-                          onAddTopics={openCreateTopicModal}
                           onDelete={handleSubjectDelete}
                           onEdit={openEditSubjectModal}
-                          onView={setViewSubject}
+                          onView={setViewSubjectFallback}
                         />
                       </TableTd>
                     </TableRow>
@@ -727,102 +770,18 @@ export function SubjectManager({ initialSubjects, initialTopics }) {
             </TableBody>
           </Table>
         </TableResponsive>
+
+        <Pagination
+          currentPage={page}
+          totalItems={pagination.total}
+          itemsPerPage={pagination.limit || SUBJECT_PAGE_LIMIT}
+          onPageChange={setPage}
+        />
       </TableContainer>
 
-      {selectedTopicSubject && (
-        <div ref={topicsTableRef} className="scroll-mt-6">
-          <TableContainer>
-          <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
-                <BookMarked size={17} />
-              </span>
-              <div className="min-w-0">
-                <h2 className="text-base font-semibold text-foreground">
-                  Topics in {selectedTopicSubject.name}
-                </h2>
-                <p className="text-sm text-muted">
-                  {selectedSubjectTopics.length} topic
-                  {selectedSubjectTopics.length === 1 ? "" : "s"} shown
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              className="button button-secondary"
-              onClick={() => openCreateTopicModal(selectedTopicSubject)}
-            >
-              <Plus size={16} />
-              Add topics
-            </button>
-          </div>
-
-          <TableResponsive>
-            <Table>
-              <TableHead>
-                <tr>
-                  <TableTh>Serial</TableTh>
-                  <TableTh>Topic</TableTh>
-                  <TableTh>Status</TableTh>
-                  <TableTh className="text-right">Action</TableTh>
-                </tr>
-              </TableHead>
-              <TableBody>
-                {selectedSubjectTopics.length > 0 ? (
-                  selectedSubjectTopics.map((topic, index) => (
-                    <TableRow key={topic.id}>
-                      <TableTd className="font-mono text-xs text-muted">
-                        {String(index + 1).padStart(2, "0")}
-                      </TableTd>
-                      <TableTd>
-                        <div className="flex min-w-72 items-center gap-3">
-                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-muted text-muted">
-                            <Layers size={16} />
-                          </span>
-                          <p className="font-semibold text-foreground">
-                            {topic.name}
-                          </p>
-                        </div>
-                      </TableTd>
-                      <TableTd>
-                        <StatusToggle
-                          checked={topic.status === "active"}
-                          label={`Set ${topic.name} active status`}
-                          onChange={(checked) =>
-                            handleTopicStatusChange(topic, checked)
-                          }
-                        />
-                      </TableTd>
-                      <TableTd>
-                        <TopicActionMenu
-                          topic={topic}
-                          onDelete={handleTopicDelete}
-                          onEdit={openEditTopicModal}
-                        />
-                      </TableTd>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableTd colSpan={4} className="py-10 text-center">
-                      <p className="font-semibold text-foreground">
-                        No topics found
-                      </p>
-                      <p className="mt-1 text-sm text-muted">
-                        Add topics for this subject when you are ready.
-                      </p>
-                    </TableTd>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableResponsive>
-          </TableContainer>
-        </div>
-      )}
-
       <SubjectModal
-        defaultParentId={selectedSubject?.id || ROOT_SUBJECT_VALUE}
+        defaultParentId={selectedParent?.id || ROOT_SUBJECT_VALUE}
+        isSubmitting={isCreating || isUpdating}
         isOpen={subjectModalState.isOpen}
         mode={subjectModalState.mode}
         parentOptions={parentOptions}
@@ -831,28 +790,13 @@ export function SubjectManager({ initialSubjects, initialTopics }) {
         onSubmit={handleSubjectSubmit}
       />
 
-      <TopicModal
-        isOpen={topicModalState.isOpen}
-        mode={topicModalState.mode}
-        subject={topicModalState.subject}
-        topic={topicModalState.topic}
-        onClose={closeTopicModal}
-        onSubmit={handleTopicSubmit}
-      />
-
       <SubjectDetailModal
-        childCount={
-          viewSubject
-            ? subjectIndex.directChildCounts.get(viewSubject.id) || 0
-            : 0
-        }
-        isOpen={Boolean(viewSubject)}
-        parent={viewedParent}
-        subject={viewSubject}
-        topicCount={
-          viewSubject ? subjectIndex.topicCounts.get(viewSubject.id) || 0 : 0
-        }
-        onClose={() => setViewSubject(null)}
+        childCount={childCount}
+        isOpen={Boolean(viewSubjectFallback)}
+        parent={detailParent}
+        subject={detailSubject}
+        topicCount={0}
+        onClose={() => setViewSubjectFallback(null)}
       />
     </div>
   );

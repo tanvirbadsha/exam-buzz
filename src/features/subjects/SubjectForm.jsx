@@ -3,7 +3,7 @@
 import { CustomDropdown } from "@/components/ui/forms/CustomDropdown";
 import { TextInput } from "@/components/ui/forms/TextInput";
 import { SUBJECT_STATUS_OPTIONS } from "@/lib/subjectData";
-import { FileText, Image as ImageIcon, Upload } from "lucide-react";
+import { FileText, Image as ImageIcon, Upload, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { HierarchicalSubjectDropdown } from "./HierarchicalSubjectDropdown";
 import { SubjectIcon } from "./SubjectIcon";
@@ -17,6 +17,9 @@ const statusOptions = SUBJECT_STATUS_OPTIONS.filter(
 const emptySubject = {
   name: "",
   icon: "",
+  iconFile: null,
+  iconName: "",
+  iconRemoved: false,
   parentId: ROOT_SUBJECT_VALUE,
   status: "active",
 };
@@ -43,10 +46,6 @@ function buildErrors(form) {
     errors.name = { message: "Subject name is required." };
   }
 
-  if (!form.icon.trim()) {
-    errors.icon = { message: "Subject icon is required." };
-  }
-
   return errors;
 }
 
@@ -62,6 +61,8 @@ function readImageFile(file) {
 
 export function SubjectForm({
   defaultParentId,
+  isSubmitting = false,
+  mode = "create",
   onSubmit,
   parentOptions,
   secondaryAction,
@@ -74,6 +75,7 @@ export function SubjectForm({
   );
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
+  const isEditMode = mode === "edit";
 
   const updateField = (field, value) => {
     setForm((currentForm) => ({ ...currentForm, [field]: value }));
@@ -106,13 +108,39 @@ export function SubjectForm({
 
     try {
       const icon = await readImageFile(file);
-      updateField("icon", icon);
+      setForm((currentForm) => ({
+        ...currentForm,
+        icon,
+        iconFile: file,
+        iconName: file.name,
+        iconRemoved: false,
+      }));
+      setErrors((currentErrors) => {
+        const nextErrors = { ...currentErrors };
+        delete nextErrors.icon;
+        return nextErrors;
+      });
     } catch {
       setErrors((currentErrors) => ({
         ...currentErrors,
         icon: { message: "Icon could not be loaded." },
       }));
     }
+  };
+
+  const removeIcon = () => {
+    setForm((currentForm) => ({
+      ...currentForm,
+      icon: "",
+      iconFile: null,
+      iconName: "",
+      iconRemoved: Boolean(currentForm.icon),
+    }));
+    setErrors((currentErrors) => {
+      const nextErrors = { ...currentErrors };
+      delete nextErrors.icon;
+      return nextErrors;
+    });
   };
 
   const handleSubmit = (event) => {
@@ -155,20 +183,37 @@ export function SubjectForm({
                 className="h-14 w-14 text-sm"
               />
               <div className="min-w-0 flex-1">
-                <label className="button button-secondary inline-flex min-h-10 cursor-pointer">
-                  <Upload size={16} />
-                  Upload icon
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="sr-only"
-                    onChange={handleIconUpload}
-                  />
-                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="button button-secondary inline-flex min-h-10 cursor-pointer">
+                    <Upload size={16} />
+                    {form.icon ? "Change icon" : "Upload icon"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={handleIconUpload}
+                    />
+                  </label>
+                  {form.icon && (
+                    <button
+                      type="button"
+                      className="button button-secondary min-h-10 text-danger hover:bg-rose-50"
+                      onClick={removeIcon}
+                    >
+                      <X size={16} />
+                      Remove
+                    </button>
+                  )}
+                </div>
                 <p className="mt-2 flex items-center gap-1.5 text-xs text-muted">
                   <ImageIcon size={13} />
                   PNG, JPG, SVG, or WebP. Max 1MB.
                 </p>
+                {form.iconName && (
+                  <p className="mt-1 truncate text-xs font-medium text-muted">
+                    {form.iconName}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -188,19 +233,25 @@ export function SubjectForm({
           searchPlaceholder="Search subjects..."
         />
 
-        <CustomDropdown
-          label="Status"
-          options={statusOptions}
-          value={form.status}
-          onChange={(option) => updateField("status", option.value)}
-          placeholder="Select status"
-        />
+        {!isEditMode && (
+          <CustomDropdown
+            label="Status"
+            options={statusOptions}
+            value={form.status}
+            onChange={(option) => updateField("status", option.value)}
+            placeholder="Select status"
+          />
+        )}
       </div>
 
       <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end">
         {secondaryAction}
-        <button type="submit" className="button button-primary">
-          {submitLabel}
+        <button
+          type="submit"
+          className="button button-primary"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "Saving..." : submitLabel}
         </button>
       </div>
     </form>
