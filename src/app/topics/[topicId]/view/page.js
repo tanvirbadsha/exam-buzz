@@ -1,13 +1,17 @@
 "use client";
 
-import { useSubjectManagement } from "@/hooks/useSubjectManagement";
-import {
-  DEFAULT_EXAM_SUBJECTS,
-  DEFAULT_SUBJECT_TOPICS,
-} from "@/lib/subjectData";
-import { ArrowLeft, BookMarked } from "lucide-react";
+import { useGetAllSubjectQuery } from "@/features/subjects/api/subjectsApi";
+import { useGetTopicByIdQuery } from "@/features/topics/api/topicsApi";
+import { useUpdateTopicMutation } from "@/features/topics/api/topicsApi";
+import { TopicModal } from "@/features/topics/TopicModal";
+import { buildSubjectOptions } from "@/features/topics/topicUtils";
+import { ArrowLeft, BookMarked, Pencil } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useMemo, useState } from "react";
+import toast from "react-hot-toast";
+
+const SUBJECT_OPTIONS_LIMIT = 1000;
 
 function formatDate(value) {
   if (!value) return "Not updated";
@@ -53,47 +57,99 @@ function TopicNotFound() {
 
 export default function ViewTopicPage() {
   const { topicId } = useParams();
-  const { subjectIndex, topics } = useSubjectManagement(
-    DEFAULT_EXAM_SUBJECTS,
-    DEFAULT_SUBJECT_TOPICS,
+  const { data, error, isLoading, refetch } = useGetTopicByIdQuery(topicId);
+  const { data: subjectsData, isFetching: isFetchingSubjects } =
+    useGetAllSubjectQuery({
+      page: 1,
+      limit: SUBJECT_OPTIONS_LIMIT,
+    });
+  const [updateTopic, { isLoading: isUpdating }] = useUpdateTopicMutation();
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const topic = data?.topic;
+  const subjectOptions = useMemo(
+    () => buildSubjectOptions([...(subjectsData?.subjects || []), topic?.subject]),
+    [subjectsData, topic],
   );
-  const topic = topics.find((currentTopic) => currentTopic.id === topicId);
 
-  if (!topic) return <TopicNotFound />;
+  if (isLoading) {
+    return (
+      <div className="mx-auto w-full max-w-5xl">
+        <div className="surface-card h-72 animate-pulse" />
+      </div>
+    );
+  }
 
-  const subject = subjectIndex.subjectsById.get(topic.subjectId);
-  const statusLabel = topic.status === "active" ? "Active" : "Inactive";
-  const responsePreview = {
-    id: topic.id,
-    subjectID: topic.subjectId,
-    name: topic.name,
-    status: topic.status === "active",
-    createdAt: topic.createdAt,
-    updatedAt: topic.updatedAt,
-    subject: subject
-      ? {
-          id: subject.id,
-          parentID: subject.parentId,
-          name: subject.name,
-          icon: subject.icon,
-          status: subject.status === "active",
-        }
-      : null,
-  };
-
-  return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-      <div>
+  if (error) {
+    return (
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
         <Link href="/topics" className="back-link">
           <ArrowLeft size={14} />
           Back to topics
         </Link>
-        <h1 className="mt-3 text-2xl font-bold text-foreground sm:text-3xl">
-          Topic details
-        </h1>
-        <p className="mt-2 text-sm text-muted">
-          View the selected topic and its assigned subject.
-        </p>
+        <section className="surface-card p-8 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-rose-50 text-danger">
+            <BookMarked size={22} />
+          </div>
+          <h1 className="mt-4 text-xl font-bold text-foreground">
+            Topic could not be loaded
+          </h1>
+          <p className="mt-2 text-sm text-muted">
+            Try loading the topic details again.
+          </p>
+          <button
+            type="button"
+            className="button button-secondary mt-5"
+            onClick={refetch}
+          >
+            Retry
+          </button>
+        </section>
+      </div>
+    );
+  }
+
+  if (!topic) return <TopicNotFound />;
+
+  const statusLabel = topic.status ? "Active" : "Inactive";
+
+  const handleTopicSubmit = async (topicInput) => {
+    try {
+      const updatedTopic = await updateTopic({
+        id: topic.id,
+        subjectID: topicInput.subjectID,
+        name: topicInput.name,
+      }).unwrap();
+      toast.success(`${updatedTopic?.topic?.name || topicInput.name} updated.`);
+      setIsEditModalOpen(false);
+    } catch {
+      toast.error("Topic could not be updated.");
+    }
+  };
+
+  return (
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <Link href="/topics" className="back-link">
+            <ArrowLeft size={14} />
+            Back to topics
+          </Link>
+          <h1 className="mt-3 text-2xl font-bold text-foreground sm:text-3xl">
+            Topic details
+          </h1>
+          <p className="mt-2 text-sm text-muted">
+            View the selected topic and its assigned subject.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="button button-primary"
+          onClick={() => setIsEditModalOpen(true)}
+          disabled={isFetchingSubjects || subjectOptions.length === 0}
+        >
+          <Pencil size={16} />
+          Edit topic
+        </button>
       </div>
 
       <section className="surface-card overflow-hidden">
@@ -114,7 +170,7 @@ export default function ViewTopicPage() {
             </div>
             <span
               className={`w-fit rounded-full border px-3 py-1 text-xs font-bold ${
-                topic.status === "active"
+                topic.status
                   ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                   : "border-slate-200 bg-slate-100 text-slate-600"
               }`}
@@ -124,28 +180,29 @@ export default function ViewTopicPage() {
           </div>
         </div>
 
-        <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_24rem]">
+        <div className="p-5">
           <dl>
             <DetailRow label="Name" value={topic.name} />
             <DetailRow
               label="Subject"
-              value={subject?.name || "Unknown subject"}
+              value={topic.subject?.name || "Unknown subject"}
             />
             <DetailRow label="Status" value={statusLabel} />
             <DetailRow label="Created" value={formatDate(topic.createdAt)} />
             <DetailRow label="Updated" value={formatDate(topic.updatedAt)} />
           </dl>
-
-          <aside className="rounded-lg border border-border bg-surface-muted p-4">
-            <h3 className="text-sm font-bold text-foreground">
-              Response preview
-            </h3>
-            <pre className="mt-3 max-h-80 overflow-auto rounded-lg border border-border bg-surface p-3 text-xs leading-5 text-foreground">
-              {JSON.stringify(responsePreview, null, 2)}
-            </pre>
-          </aside>
         </div>
       </section>
+
+      <TopicModal
+        isOpen={isEditModalOpen}
+        mode="edit"
+        onClose={() => setIsEditModalOpen(false)}
+        onSubmit={handleTopicSubmit}
+        isSubmitting={isUpdating}
+        subjectOptions={subjectOptions}
+        topic={topic}
+      />
     </div>
   );
 }
