@@ -37,6 +37,7 @@ const menuItems = [
     isDropdown: true,
     children: [
       { label: "Exams", href: "/exams" },
+      { label: "Sections", href: "/sections" },
       { label: "Exam Types", href: "/exam-types" },
       // { label: "Question Bank", href: "/exams/questions" },
       // { label: "Results", href: "/exams/results" },
