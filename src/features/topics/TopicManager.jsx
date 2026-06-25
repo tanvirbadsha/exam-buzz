@@ -15,6 +15,7 @@ import { FloatingActionMenu } from "@/components/ui/FloatingActionMenu";
 import { CustomDropdown } from "@/components/ui/forms/CustomDropdown";
 import { Pagination } from "@/components/ui/Pagination";
 import { StatusToggle } from "@/components/ui/StatusToggle";
+import { useGetAllSubjectQuery } from "@/features/subjects/api/subjectsApi";
 import { HierarchicalSubjectDropdown } from "@/features/subjects/HierarchicalSubjectDropdown";
 import {
   useCreateTopicMutation,
@@ -23,6 +24,13 @@ import {
   useUpdateTopicMutation,
   useUpdateTopicStatusMutation,
 } from "@/features/topics/api/topicsApi";
+import {
+  ALL_SUBJECTS_VALUE,
+  buildSubjectOptions,
+  getSubjectFilterOptions,
+  getTopicsFromResponse,
+  getTotalFromResponse,
+} from "@/features/topics/topicUtils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
   BookMarked,
@@ -32,7 +40,9 @@ import {
   Pencil,
   Plus,
   RotateCcw,
+  ShieldAlert,
   Trash2,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -40,7 +50,6 @@ import toast from "react-hot-toast";
 import { TopicModal } from "./TopicModal";
 
 const ITEMS_PER_PAGE = 20;
-const ALL_SUBJECTS_VALUE = "all";
 const ALL_STATUSES_VALUE = "all";
 const SUBJECT_OPTIONS_LIMIT = 1000;
 
@@ -49,105 +58,6 @@ const statusFilterOptions = [
   { label: "Active", value: true },
   { label: "Inactive", value: false },
 ];
-
-function sortByName(items) {
-  return [...items].sort((firstItem, secondItem) =>
-    firstItem.name.localeCompare(secondItem.name),
-  );
-}
-
-function getTopicsFromResponse(response) {
-  return Array.isArray(response?.topics) ? response.topics : [];
-}
-
-function getTotalFromResponse(response, fallbackCount) {
-  return (
-    response?.total ??
-    response?.totalItems ??
-    response?.pagination?.total ??
-    response?.meta?.total ??
-    fallbackCount
-  );
-}
-
-function normalizeSubject(subject) {
-  if (!subject?.id) return null;
-
-  return {
-    id: subject.id,
-    parentID: subject.parentID ?? subject.parentId ?? null,
-    name: subject.name || `Subject ${subject.id}`,
-  };
-}
-
-function extractSubjectsFromTopics(topics) {
-  const subjectsById = new Map();
-
-  topics.forEach((topic) => {
-    const subject = normalizeSubject(topic.subject);
-    if (!subject) return;
-    subjectsById.set(subject.id, subject);
-  });
-
-  return Array.from(subjectsById.values());
-}
-
-function buildSubjectOptions(subjects) {
-  const subjectsById = new Map();
-
-  subjects.forEach((subject) => {
-    const normalizedSubject = normalizeSubject(subject);
-    if (!normalizedSubject) return;
-    subjectsById.set(normalizedSubject.id, normalizedSubject);
-  });
-
-  const normalizedSubjects = Array.from(subjectsById.values());
-  const subjectIds = new Set(normalizedSubjects.map((subject) => subject.id));
-  const childrenMap = new Map();
-
-  normalizedSubjects.forEach((subject) => {
-    const parentKey =
-      subject.parentID && subjectIds.has(subject.parentID)
-        ? subject.parentID
-        : "root";
-    const children = childrenMap.get(parentKey) || [];
-    children.push(subject);
-    childrenMap.set(parentKey, children);
-  });
-
-  const options = [];
-  const walk = (parentId = "root", depth = 0, parentPath = []) => {
-    const children = sortByName(childrenMap.get(parentId) || []);
-
-    children.forEach((subject) => {
-      const path = [...parentPath, subject.name];
-      options.push({
-        label: subject.name,
-        value: subject.id,
-        depth,
-        meta: path.join(" / "),
-        searchText: path.join(" "),
-      });
-      walk(subject.id, depth + 1, path);
-    });
-  };
-
-  walk();
-  return options;
-}
-
-function getSubjectFilterOptions(subjectOptions) {
-  return [
-    {
-      label: "All subjects",
-      value: ALL_SUBJECTS_VALUE,
-      depth: 0,
-      meta: "All subjects",
-      searchText: "All subjects",
-    },
-    ...subjectOptions,
-  ];
-}
 
 function TopicActionMenu({ onDelete, onEdit, topic }) {
   return (
@@ -196,6 +106,75 @@ function TopicActionMenu({ onDelete, onEdit, topic }) {
   );
 }
 
+function DeleteTopicDialog({ isDeleting, onClose, onConfirm, topic }) {
+  if (!topic) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6 backdrop-blur-[2px]"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-topic-title"
+    >
+      <button
+        type="button"
+        className="fixed inset-0 cursor-default"
+        aria-label="Close delete confirmation"
+        onClick={onClose}
+        disabled={isDeleting}
+      />
+      <div className="relative w-full max-w-md overflow-hidden rounded-lg border border-rose-100 bg-surface shadow-2xl">
+        <div className="flex items-start gap-4 border-b border-border bg-rose-50 px-5 py-4">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-white text-danger shadow-sm">
+            <ShieldAlert size={21} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2
+              id="delete-topic-title"
+              className="text-lg font-bold text-foreground"
+            >
+              Delete topic?
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-muted">
+              This will permanently remove{" "}
+              <span className="font-semibold text-foreground">{topic.name}</span>
+              . This action cannot be undone.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="icon-button h-9 w-9"
+            aria-label="Close delete confirmation"
+            onClick={onClose}
+            disabled={isDeleting}
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div className="flex flex-col-reverse gap-3 px-5 py-4 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            className="button button-secondary"
+            onClick={onClose}
+            disabled={isDeleting}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="button button-danger"
+            onClick={onConfirm}
+            disabled={isDeleting}
+          >
+            <Trash2 size={16} />
+            {isDeleting ? "Deleting..." : "Delete topic"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function TopicManager() {
   const [searchQuery, setSearchQuery] = useState("");
   const [subjectFilter, setSubjectFilter] = useState(ALL_SUBJECTS_VALUE);
@@ -206,6 +185,7 @@ export function TopicManager() {
     mode: "create",
     topic: null,
   });
+  const [deleteTopicState, setDeleteTopicState] = useState(null);
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 450);
 
   const queryArgs = useMemo(
@@ -222,8 +202,8 @@ export function TopicManager() {
 
   const { data, error, isFetching, isLoading, refetch } =
     useGetAllTopicsQuery(queryArgs);
-  const { data: subjectSourceData, isFetching: isFetchingSubjects } =
-    useGetAllTopicsQuery({
+  const { data: subjectsData, isFetching: isFetchingSubjects } =
+    useGetAllSubjectQuery({
       page: 1,
       limit: SUBJECT_OPTIONS_LIMIT,
     });
@@ -239,13 +219,10 @@ export function TopicManager() {
   const activeTopics = topics.filter((topic) => topic.status === true).length;
   const isBusy = isCreating || isUpdating || isDeleting;
 
-  const subjectOptions = useMemo(() => {
-    const sourceTopics = getTopicsFromResponse(subjectSourceData);
-    const subjects = extractSubjectsFromTopics(sourceTopics);
-    const currentSubjects = extractSubjectsFromTopics(topics);
-
-    return buildSubjectOptions([...subjects, ...currentSubjects]);
-  }, [subjectSourceData, topics]);
+  const subjectOptions = useMemo(
+    () => buildSubjectOptions(subjectsData?.subjects || []),
+    [subjectsData],
+  );
 
   const subjectFilterOptions = useMemo(
     () => getSubjectFilterOptions(subjectOptions),
@@ -316,16 +293,24 @@ export function TopicManager() {
     }
   };
 
-  const handleDelete = async (topic) => {
-    const confirmed = window.confirm(`Delete ${topic.name}?`);
-    if (!confirmed) return;
+  const openDeleteDialog = (topic) => {
+    setDeleteTopicState(topic);
+  };
+
+  const closeDeleteDialog = () => {
+    setDeleteTopicState(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTopicState) return;
 
     try {
-      await deleteTopic(topic.id).unwrap();
-      toast.success(`${topic.name} deleted.`);
+      await deleteTopic(deleteTopicState.id).unwrap();
+      toast.success(`${deleteTopicState.name} deleted.`);
       if (topics.length === 1 && currentPage > 1) {
         setCurrentPage((page) => Math.max(1, page - 1));
       }
+      closeDeleteDialog();
     } catch {
       toast.error("Topic could not be deleted.");
     }
@@ -515,7 +500,7 @@ export function TopicManager() {
                     <TableTd>
                       <TopicActionMenu
                         topic={topic}
-                        onDelete={handleDelete}
+                        onDelete={openDeleteDialog}
                         onEdit={openEditModal}
                       />
                     </TableTd>
@@ -556,6 +541,12 @@ export function TopicManager() {
         subjectOptions={subjectOptions}
         topic={modalState.topic}
         isSubmitting={isBusy}
+      />
+      <DeleteTopicDialog
+        isDeleting={isDeleting}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDeleteConfirm}
+        topic={deleteTopicState}
       />
     </div>
   );

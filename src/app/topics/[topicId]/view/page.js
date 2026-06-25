@@ -1,9 +1,17 @@
 "use client";
 
+import { useGetAllSubjectQuery } from "@/features/subjects/api/subjectsApi";
 import { useGetTopicByIdQuery } from "@/features/topics/api/topicsApi";
-import { ArrowLeft, BookMarked } from "lucide-react";
+import { useUpdateTopicMutation } from "@/features/topics/api/topicsApi";
+import { TopicModal } from "@/features/topics/TopicModal";
+import { buildSubjectOptions } from "@/features/topics/topicUtils";
+import { ArrowLeft, BookMarked, Pencil } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useMemo, useState } from "react";
+import toast from "react-hot-toast";
+
+const SUBJECT_OPTIONS_LIMIT = 1000;
 
 function formatDate(value) {
   if (!value) return "Not updated";
@@ -50,7 +58,18 @@ function TopicNotFound() {
 export default function ViewTopicPage() {
   const { topicId } = useParams();
   const { data, error, isLoading, refetch } = useGetTopicByIdQuery(topicId);
+  const { data: subjectsData, isFetching: isFetchingSubjects } =
+    useGetAllSubjectQuery({
+      page: 1,
+      limit: SUBJECT_OPTIONS_LIMIT,
+    });
+  const [updateTopic, { isLoading: isUpdating }] = useUpdateTopicMutation();
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const topic = data?.topic;
+  const subjectOptions = useMemo(
+    () => buildSubjectOptions([...(subjectsData?.subjects || []), topic?.subject]),
+    [subjectsData, topic],
+  );
 
   if (isLoading) {
     return (
@@ -92,29 +111,45 @@ export default function ViewTopicPage() {
   if (!topic) return <TopicNotFound />;
 
   const statusLabel = topic.status ? "Active" : "Inactive";
-  const responsePreview = {
-    id: topic.id,
-    subjectID: topic.subjectID,
-    name: topic.name,
-    status: topic.status,
-    createdAt: topic.createdAt,
-    updatedAt: topic.updatedAt,
-    subject: topic.subject || null,
+
+  const handleTopicSubmit = async (topicInput) => {
+    try {
+      const updatedTopic = await updateTopic({
+        id: topic.id,
+        subjectID: topicInput.subjectID,
+        name: topicInput.name,
+      }).unwrap();
+      toast.success(`${updatedTopic?.topic?.name || topicInput.name} updated.`);
+      setIsEditModalOpen(false);
+    } catch {
+      toast.error("Topic could not be updated.");
+    }
   };
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-      <div>
-        <Link href="/topics" className="back-link">
-          <ArrowLeft size={14} />
-          Back to topics
-        </Link>
-        <h1 className="mt-3 text-2xl font-bold text-foreground sm:text-3xl">
-          Topic details
-        </h1>
-        <p className="mt-2 text-sm text-muted">
-          View the selected topic and its assigned subject.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <Link href="/topics" className="back-link">
+            <ArrowLeft size={14} />
+            Back to topics
+          </Link>
+          <h1 className="mt-3 text-2xl font-bold text-foreground sm:text-3xl">
+            Topic details
+          </h1>
+          <p className="mt-2 text-sm text-muted">
+            View the selected topic and its assigned subject.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="button button-primary"
+          onClick={() => setIsEditModalOpen(true)}
+          disabled={isFetchingSubjects || subjectOptions.length === 0}
+        >
+          <Pencil size={16} />
+          Edit topic
+        </button>
       </div>
 
       <section className="surface-card overflow-hidden">
@@ -145,7 +180,7 @@ export default function ViewTopicPage() {
           </div>
         </div>
 
-        <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_24rem]">
+        <div className="p-5">
           <dl>
             <DetailRow label="Name" value={topic.name} />
             <DetailRow
@@ -156,17 +191,18 @@ export default function ViewTopicPage() {
             <DetailRow label="Created" value={formatDate(topic.createdAt)} />
             <DetailRow label="Updated" value={formatDate(topic.updatedAt)} />
           </dl>
-
-          <aside className="rounded-lg border border-border bg-surface-muted p-4">
-            <h3 className="text-sm font-bold text-foreground">
-              Response preview
-            </h3>
-            <pre className="mt-3 max-h-80 overflow-auto rounded-lg border border-border bg-surface p-3 text-xs leading-5 text-foreground">
-              {JSON.stringify(responsePreview, null, 2)}
-            </pre>
-          </aside>
         </div>
       </section>
+
+      <TopicModal
+        isOpen={isEditModalOpen}
+        mode="edit"
+        onClose={() => setIsEditModalOpen(false)}
+        onSubmit={handleTopicSubmit}
+        isSubmitting={isUpdating}
+        subjectOptions={subjectOptions}
+        topic={topic}
+      />
     </div>
   );
 }
