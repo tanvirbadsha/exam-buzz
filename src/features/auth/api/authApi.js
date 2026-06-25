@@ -1,0 +1,205 @@
+import {
+  AUTH_TOKEN_COOKIE_NAME,
+  AUTH_TOKEN_STORAGE_KEY,
+  ROLE_COOKIE_NAME,
+  ROLES,
+} from "@/lib/auth/constants";
+import { apiSlice } from "@/store/apiSlice";
+import { clearCredentials, setCredentials } from "@/store/authSlice";
+
+const ROLE_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
+
+function getAuthPayload(result) {
+  const user = result?.user || result?.admin || null;
+  const role =
+    result?.role || user?.role || (result?.admin ? ROLES.ADMIN : null);
+  const token = result?.token || null;
+
+  return { user, role, token };
+}
+
+function setRoleCookie(role) {
+  if (typeof window === "undefined" || !role) return;
+
+  document.cookie = `${ROLE_COOKIE_NAME}=${role}; path=/; max-age=${ROLE_COOKIE_MAX_AGE}; SameSite=Lax`;
+}
+
+function clearRoleCookie() {
+  if (typeof window === "undefined") return;
+
+  document.cookie = `${ROLE_COOKIE_NAME}=; path=/; max-age=0`;
+}
+
+function setAuthToken(token) {
+  if (typeof window === "undefined" || !token) return;
+
+  window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+  document.cookie = `${AUTH_TOKEN_COOKIE_NAME}=${token}; path=/; max-age=${ROLE_COOKIE_MAX_AGE}; SameSite=Lax`;
+}
+
+function clearAuthToken() {
+  if (typeof window === "undefined") return;
+
+  window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+  document.cookie = `${AUTH_TOKEN_COOKIE_NAME}=; path=/; max-age=0`;
+}
+
+export const authApi = apiSlice.injectEndpoints({
+  endpoints: (builder) => ({
+    login: builder.mutation({
+      query: (data) => ({
+        url: "/auth/admin/login",
+        method: "POST",
+        body: data,
+      }),
+      async onQueryStarted(_data, { dispatch, queryFulfilled }) {
+        try {
+          const { data: responseData } = await queryFulfilled;
+          const authPayload = getAuthPayload(responseData);
+
+          dispatch(setCredentials(authPayload));
+          setRoleCookie(authPayload.role);
+          setAuthToken(authPayload.token);
+        } catch {
+          dispatch(clearCredentials());
+          clearRoleCookie();
+          clearAuthToken();
+        }
+      },
+    }),
+    logout: builder.mutation({
+      query: () => ({
+        url: "/auth/logout",
+        method: "POST",
+      }),
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+        } catch {
+        } finally {
+          dispatch(clearCredentials());
+          clearRoleCookie();
+          clearAuthToken();
+        }
+      },
+    }),
+    registerAdmin: builder.mutation({
+      query: (data) => ({
+        url: `/auth/admin/register`,
+        method: "POST",
+        body: data,
+      }),
+      invalidatesTags: [{ type: "User", id: "Admin-LIST" }],
+    }),
+    changeAdminPassword: builder.mutation({
+      query: (data) => ({
+        url: `/auth/admin/change-password`,
+        method: "POST",
+        body: data,
+      }),
+      async onQueryStarted(_data, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+        } catch {
+          // Handle error if needed
+        }
+      },
+    }),
+    getAdminProfile: builder.query({
+      query: () => ({
+        url: `/auth/admin/get-profile`,
+        method: "GET",
+      }),
+      providesTags: [{ type: "User", id: "Admin-Profile" }],
+    }),
+    getAdminById: builder.query({
+      query: (id) => ({
+        url: `/auth/admin/get-admin/${id}`,
+        method: "GET",
+      }),
+      providesTags: (_result, _error, id) => [
+        { type: "User", id: String(id) },
+      ],
+    }),
+    getAllAdmins: builder.query({
+      query: ({ search, page, limit }) => {
+        const params = new URLSearchParams();
+        if (search) params.append("search", search);
+        if (page) params.append("page", page.toString());
+        if (limit) params.append("limit", limit.toString());
+
+        return {
+          url: `/auth/admin/get-all-admins?${params.toString()}`,
+          method: "GET",
+        };
+      },
+      providesTags: (result) => [
+        { type: "User", id: "Admin-LIST" },
+        ...(result?.admins || []).map((admin) => ({
+          type: "User",
+          id: String(admin.id),
+        })),
+      ],
+    }),
+    updateAdminProfile: builder.mutation({
+      query: (data) => ({
+        url: `/auth/admin/update-profile`,
+        method: "PATCH",
+        body: data,
+      }),
+      invalidatesTags: (result) => [
+        { type: "User", id: "Admin-LIST" },
+        { type: "User", id: "Admin-Profile" },
+        ...(result?.admin?.id
+          ? [{ type: "User", id: String(result.admin.id) }]
+          : []),
+      ],
+    }),
+    changeSuperAdminStatus: builder.mutation({
+      query: (data) => {
+        const id = typeof data === "object" ? data.id : data;
+        const isSuperAdmin =
+          typeof data === "object" ? data.isSuperAdmin : undefined;
+
+        return {
+          url: `/auth/admin/change-super-admin/${id}`,
+          method: "PATCH",
+          ...(isSuperAdmin === undefined
+            ? {}
+            : { body: { isSuperAdmin } }),
+        };
+      },
+      invalidatesTags: (_result, _error, data) => {
+        const id = typeof data === "object" ? data.id : data;
+
+        return [
+          { type: "User", id: "Admin-LIST" },
+          { type: "User", id: String(id) },
+        ];
+      },
+    }),
+    deleteAdmin: builder.mutation({
+      query: (id) => ({
+        url: `/auth/admin/delete-admin/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (_result, _error, id) => [
+        { type: "User", id: "Admin-LIST" },
+        { type: "User", id: String(id) },
+      ],
+    }),
+  }),
+});
+
+export const {
+  useLoginMutation,
+  useLogoutMutation,
+  useRegisterAdminMutation,
+  useChangeAdminPasswordMutation,
+  useGetAdminProfileQuery,
+  useGetAdminByIdQuery,
+  useGetAllAdminsQuery,
+  useUpdateAdminProfileMutation,
+  useChangeSuperAdminStatusMutation,
+  useDeleteAdminMutation,
+} = authApi;

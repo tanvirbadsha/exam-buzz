@@ -1,7 +1,6 @@
 "use client";
 
 import { FileText, UploadCloud, X } from "lucide-react";
-import Image from "next/image";
 import { forwardRef, useEffect, useRef, useState } from "react";
 
 export const FileUpload = forwardRef(
@@ -134,12 +133,10 @@ export const FileUpload = forwardRef(
                     <FileText size={20} />
                   </div>
                 ) : (
-                  <Image
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
                     src={preview}
                     alt={`Preview of ${fileName}`}
-                    width={40}
-                    height={40}
-                    unoptimized // Keep this, as external server URLs will fail Next.js optimization without config
                     className="h-10 w-10 shrink-0 rounded-lg border border-border object-cover"
                   />
                 )}

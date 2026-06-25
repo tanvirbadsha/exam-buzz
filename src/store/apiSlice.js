@@ -1,44 +1,58 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { clearCredentials } from "@/store/authSlice";
+import {
+  AUTH_TOKEN_COOKIE_NAME,
+  AUTH_TOKEN_STORAGE_KEY,
+  ROLE_COOKIE_NAME,
+} from "@/lib/auth/constants";
 
-const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
-const apiBaseUrl = configuredApiBaseUrl
-  ? `${configuredApiBaseUrl.replace(/\/+$/, "")}/`
-  : "/api/";
+const baseQuery = fetchBaseQuery({
+  baseUrl: process.env.NEXT_PUBLIC_BASE_URL,
+  credentials: "include",
+  prepareHeaders: (headers, { getState }) => {
+    const token =
+      getState().auth?.token ||
+      (typeof window !== "undefined"
+        ? window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY)
+        : null);
+
+    headers.set("Accept", "application/json");
+
+    if (process.env.NEXT_PUBLIC_BASE_API_KEY) {
+      headers.set("x-api-key", process.env.NEXT_PUBLIC_BASE_API_KEY);
+    }
+
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+
+    return headers;
+  },
+});
+
+async function baseQueryWithAuthGuard(args, api, extraOptions) {
+  const result = await baseQuery(args, api, extraOptions);
+
+  if (result.error && [401, 403].includes(result.error.status)) {
+    api.dispatch(clearCredentials());
+
+    if (typeof window !== "undefined") {
+      document.cookie = `${ROLE_COOKIE_NAME}=; path=/; max-age=0`;
+      document.cookie = `${AUTH_TOKEN_COOKIE_NAME}=; path=/; max-age=0`;
+      window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+    }
+  }
+
+  return result;
+}
 
 export const apiSlice = createApi({
   reducerPath: "api",
-  baseQuery: fetchBaseQuery({
-    baseUrl: apiBaseUrl,
-    credentials: "omit",
-    prepareHeaders: (headers, { endpoint, getState }) => {
-      const token = getState().auth?.token;
-
-      headers.set("Accept", "application/json");
-
-      if (process.env.NEXT_PUBLIC_API_KEY) {
-        headers.set("x-api-key", process.env.NEXT_PUBLIC_API_KEY);
-      }
-
-      if (token) {
-        headers.set("Authorization", token);
-      }
-
-      return headers;
-    },
-  }),
-  tagTypes: [
-    "Auth",
-    "Course",
-    "Exam",
-    "Question",
-    "Result",
-    "User",
-  ],
-  endpoints: (builder) => ({
-    healthCheck: builder.query({
-      query: () => "health",
-    }),
-  }),
+  baseQuery: baseQueryWithAuthGuard,
+  tagTypes: ["User"],
+  endpoints: () => ({}),
 });
-
-export const { useHealthCheckQuery } = apiSlice;
