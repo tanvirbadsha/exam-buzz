@@ -8,8 +8,12 @@ export function TableResponsive({ children }) {
   return <div className="overflow-x-auto">{children}</div>;
 }
 
-export function Table({ children }) {
-  return <table className="w-full text-left border-collapse">{children}</table>;
+export function Table({ children, className = "" }) {
+  return (
+    <table className={`w-full text-left border-collapse ${className}`}>
+      {children}
+    </table>
+  );
 }
 
 export function TableHead({ children }) {

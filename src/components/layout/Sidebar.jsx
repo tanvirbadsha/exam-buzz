@@ -36,6 +36,7 @@ const menuItems = [
     icon: BookOpenCheck,
     isDropdown: true,
     children: [
+      { label: "Exams", href: "/exams" },
       { label: "Exam Types", href: "/exam-types" },
       // { label: "Question Bank", href: "/exams/questions" },
       // { label: "Results", href: "/exams/results" },
