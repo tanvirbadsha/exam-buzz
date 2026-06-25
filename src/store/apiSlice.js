@@ -53,6 +53,6 @@ async function baseQueryWithAuthGuard(args, api, extraOptions) {
 export const apiSlice = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithAuthGuard,
-  tagTypes: ["User", "ExamType", "Category"],
+  tagTypes: ["User", "ExamType", "Category", "Subject"],
   endpoints: () => ({}),
 });
