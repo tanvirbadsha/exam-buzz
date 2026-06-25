@@ -15,6 +15,7 @@ import {
   PackageCheck,
   Settings,
   ShieldAlert,
+  Tags,
   UserRoundCog,
   Users,
   Video,
@@ -49,6 +50,11 @@ const menuItems = [
     label: "Subjects",
     icon: BookOpenText,
     href: "/subjects",
+  },
+  {
+    label: "Topics",
+    icon: Tags,
+    href: "/topics",
   },
   {
     label: "Materials",
