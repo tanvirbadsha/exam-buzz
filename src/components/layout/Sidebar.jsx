@@ -15,6 +15,7 @@ import {
   PackageCheck,
   Settings,
   ShieldAlert,
+  Tags,
   UserRoundCog,
   Users,
   Video,
@@ -35,6 +36,7 @@ const menuItems = [
     icon: BookOpenCheck,
     isDropdown: true,
     children: [
+      { label: "Exams", href: "/exams" },
       { label: "Exam Types", href: "/exam-types" },
       // { label: "Question Bank", href: "/exams/questions" },
       // { label: "Results", href: "/exams/results" },
@@ -49,6 +51,11 @@ const menuItems = [
     label: "Subjects",
     icon: BookOpenText,
     href: "/subjects",
+  },
+  {
+    label: "Topics",
+    icon: Tags,
+    href: "/topics",
   },
   {
     label: "Materials",
