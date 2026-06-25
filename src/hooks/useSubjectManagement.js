@@ -153,12 +153,17 @@ function normalizeSubject(subjectInput, currentSubject = {}) {
 }
 
 function normalizeTopic(topicInput, currentTopic = {}) {
+  const subjectId = topicInput.subjectId ?? topicInput.subjectID;
+  const rawStatus = topicInput.status ?? currentTopic.status ?? "active";
+  const status =
+    typeof rawStatus === "boolean" ? (rawStatus ? "active" : "inactive") : rawStatus;
+
   return {
     ...currentTopic,
     id: currentTopic.id || createTopicId(),
-    subjectId: topicInput.subjectId,
+    subjectId,
     name: topicInput.name.trim(),
-    status: topicInput.status || "active",
+    status,
     createdAt: currentTopic.createdAt || new Date().toISOString(),
     updatedAt: currentTopic.id ? new Date().toISOString() : undefined,
   };
@@ -288,7 +293,12 @@ export function useSubjectManagement(initialSubjects, initialTopics) {
   const createTopics = useCallback(
     (subjectId, topicInputs) => {
       const nextTopics = topicInputs
-        .map((topicInput) => normalizeTopic({ ...topicInput, subjectId }))
+        .map((topicInput) =>
+          normalizeTopic({
+            ...topicInput,
+            subjectId: topicInput.subjectId ?? topicInput.subjectID ?? subjectId,
+          }),
+        )
         .filter((topic) => topic.name);
 
       if (nextTopics.length === 0) return [];
@@ -305,8 +315,10 @@ export function useSubjectManagement(initialSubjects, initialTopics) {
       const nextTopics = topics.map((topic) => {
         if (topic.id !== topicId) return topic;
 
+        const subjectId = topicInput.subjectId ?? topicInput.subjectID ?? topic.subjectId;
+
         updatedTopic = normalizeTopic(
-          { ...topic, ...topicInput, subjectId: topic.subjectId },
+          { ...topic, ...topicInput, subjectId },
           topic,
         );
         return updatedTopic;
