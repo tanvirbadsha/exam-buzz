@@ -1,13 +1,41 @@
 import { CategoryManager } from "@/features/categories/CategoryManager";
-import { DEFAULT_EXAM_CATEGORIES } from "@/lib/categoryData";
+import { ssrFetch } from "@/lib/api/ssrFetch";
 
-async function getCategories() {
-  // Replace this mock with the categories API call when the endpoint is ready.
-  return DEFAULT_EXAM_CATEGORIES;
+const FIRST_CATEGORY_PAGE = 1;
+const CATEGORY_PAGE_LIMIT = 10;
+
+function emptyCategoryResponse(message) {
+  return {
+    status: 500,
+    message,
+    categories: [],
+    pagination: {
+      total: 0,
+      page: FIRST_CATEGORY_PAGE,
+      limit: CATEGORY_PAGE_LIMIT,
+      totalPages: 0,
+    },
+    _error: true,
+  };
+}
+
+async function getInitialCategories() {
+  const params = new URLSearchParams({
+    page: String(FIRST_CATEGORY_PAGE),
+    limit: String(CATEGORY_PAGE_LIMIT),
+  });
+
+  try {
+    return await ssrFetch(`/category/get-all-categories?${params}`);
+  } catch (error) {
+    return emptyCategoryResponse(
+      error?.message || "Unable to load categories.",
+    );
+  }
 }
 
 export default async function CategoriesPage() {
-  const categories = await getCategories();
+  const initialData = await getInitialCategories();
 
-  return <CategoryManager initialCategories={categories} />;
+  return <CategoryManager initialData={initialData} />;
 }
