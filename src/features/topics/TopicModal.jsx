@@ -48,6 +48,7 @@ function TopicModalForm({
   mode,
   onClose,
   onSubmit,
+  isSubmitting = false,
   subjectOptions,
   topic,
 }) {
@@ -71,6 +72,7 @@ function TopicModalForm({
 
   const handleSubmit = (event) => {
     event.preventDefault();
+    if (isSubmitting) return;
 
     const nextErrors = buildErrors(form, subjectIds);
     setErrors(nextErrors);
@@ -87,7 +89,6 @@ function TopicModalForm({
     }
 
     onSubmit(topicInput);
-    onClose();
   };
 
   return (
@@ -131,11 +132,16 @@ function TopicModalForm({
           type="button"
           className="button button-secondary"
           onClick={onClose}
+          disabled={isSubmitting}
         >
           Cancel
         </button>
-        <button type="submit" className="button button-primary">
-          {isEditMode ? "Save changes" : "Create topic"}
+        <button type="submit" className="button button-primary" disabled={isSubmitting}>
+          {isSubmitting
+            ? "Saving..."
+            : isEditMode
+              ? "Save changes"
+              : "Create topic"}
         </button>
       </div>
     </form>
@@ -147,6 +153,7 @@ export function TopicModal({
   mode,
   onClose,
   onSubmit,
+  isSubmitting = false,
   subjectOptions,
   topic,
 }) {
@@ -210,6 +217,7 @@ export function TopicModal({
           mode={mode}
           onClose={onClose}
           onSubmit={onSubmit}
+          isSubmitting={isSubmitting}
           subjectOptions={subjectOptions}
           topic={topic}
         />

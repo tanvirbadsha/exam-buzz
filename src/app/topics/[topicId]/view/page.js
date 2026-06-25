@@ -1,10 +1,6 @@
 "use client";
 
-import { useSubjectManagement } from "@/hooks/useSubjectManagement";
-import {
-  DEFAULT_EXAM_SUBJECTS,
-  DEFAULT_SUBJECT_TOPICS,
-} from "@/lib/subjectData";
+import { useGetTopicByIdQuery } from "@/features/topics/api/topicsApi";
 import { ArrowLeft, BookMarked } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -53,32 +49,57 @@ function TopicNotFound() {
 
 export default function ViewTopicPage() {
   const { topicId } = useParams();
-  const { subjectIndex, topics } = useSubjectManagement(
-    DEFAULT_EXAM_SUBJECTS,
-    DEFAULT_SUBJECT_TOPICS,
-  );
-  const topic = topics.find((currentTopic) => currentTopic.id === topicId);
+  const { data, error, isLoading, refetch } = useGetTopicByIdQuery(topicId);
+  const topic = data?.topic;
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto w-full max-w-5xl">
+        <div className="surface-card h-72 animate-pulse" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+        <Link href="/topics" className="back-link">
+          <ArrowLeft size={14} />
+          Back to topics
+        </Link>
+        <section className="surface-card p-8 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-rose-50 text-danger">
+            <BookMarked size={22} />
+          </div>
+          <h1 className="mt-4 text-xl font-bold text-foreground">
+            Topic could not be loaded
+          </h1>
+          <p className="mt-2 text-sm text-muted">
+            Try loading the topic details again.
+          </p>
+          <button
+            type="button"
+            className="button button-secondary mt-5"
+            onClick={refetch}
+          >
+            Retry
+          </button>
+        </section>
+      </div>
+    );
+  }
 
   if (!topic) return <TopicNotFound />;
 
-  const subject = subjectIndex.subjectsById.get(topic.subjectId);
-  const statusLabel = topic.status === "active" ? "Active" : "Inactive";
+  const statusLabel = topic.status ? "Active" : "Inactive";
   const responsePreview = {
     id: topic.id,
-    subjectID: topic.subjectId,
+    subjectID: topic.subjectID,
     name: topic.name,
-    status: topic.status === "active",
+    status: topic.status,
     createdAt: topic.createdAt,
     updatedAt: topic.updatedAt,
-    subject: subject
-      ? {
-          id: subject.id,
-          parentID: subject.parentId,
-          name: subject.name,
-          icon: subject.icon,
-          status: subject.status === "active",
-        }
-      : null,
+    subject: topic.subject || null,
   };
 
   return (
@@ -114,7 +135,7 @@ export default function ViewTopicPage() {
             </div>
             <span
               className={`w-fit rounded-full border px-3 py-1 text-xs font-bold ${
-                topic.status === "active"
+                topic.status
                   ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                   : "border-slate-200 bg-slate-100 text-slate-600"
               }`}
@@ -129,7 +150,7 @@ export default function ViewTopicPage() {
             <DetailRow label="Name" value={topic.name} />
             <DetailRow
               label="Subject"
-              value={subject?.name || "Unknown subject"}
+              value={topic.subject?.name || "Unknown subject"}
             />
             <DetailRow label="Status" value={statusLabel} />
             <DetailRow label="Created" value={formatDate(topic.createdAt)} />
