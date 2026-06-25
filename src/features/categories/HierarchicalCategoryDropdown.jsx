@@ -416,7 +416,7 @@ export function HierarchicalCategoryDropdown({
 
                   return (
                     <div
-                      key={option.value}
+                      key={`${option.value}-${index}`}
                       role="option"
                       aria-selected={isSelected}
                       onMouseEnter={() => {

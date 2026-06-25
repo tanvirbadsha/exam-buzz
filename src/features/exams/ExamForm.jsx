@@ -40,8 +40,10 @@ const emptyExam = {
   expiredTime: "",
   questionPDF: "",
   questionPDFName: "",
+  questionPDFFile: null,
   demoAnswerPDF: "",
   demoAnswerPDFName: "",
+  demoAnswerPDFFile: null,
   packageId: "",
   status: true,
 };
@@ -58,25 +60,41 @@ function sortByName(items) {
 
 function buildTreeOptions(childrenMap) {
   const options = [];
+  const visitedIds = new Set();
 
   const walk = (parentId = "root", depth = 0, parentPath = []) => {
     const children = sortByName(childrenMap.get(parentId) || []);
 
     children.forEach((item) => {
+      const itemId = String(item.id ?? "");
+      if (!itemId || visitedIds.has(itemId)) return;
+
+      visitedIds.add(itemId);
       const path = [...parentPath, item.name];
       options.push({
         label: item.name,
-        value: item.id,
+        value: itemId,
         depth,
         meta: path.join(" / "),
         searchText: path.join(" "),
       });
-      walk(item.id, depth + 1, path);
+      walk(itemId, depth + 1, path);
     });
   };
 
   walk();
   return options;
+}
+
+function uniqueOptionsByValue(options) {
+  const seenValues = new Set();
+
+  return options.filter((option) => {
+    const value = String(option.value ?? "");
+    if (!value || seenValues.has(value)) return false;
+    seenValues.add(value);
+    return true;
+  });
 }
 
 function clamp(value, min, max) {
@@ -164,13 +182,8 @@ function fromDateInputValue(value) {
   return `${match[3]}-${match[2]}-${match[1]}`;
 }
 
-function readFileAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener("load", () => resolve(reader.result));
-    reader.addEventListener("error", () => reject(reader.error));
-    reader.readAsDataURL(file);
-  });
+function getPdfFileField(pdfField) {
+  return `${pdfField}File`;
 }
 
 function buildInitialForm(exam) {
@@ -179,7 +192,7 @@ function buildInitialForm(exam) {
   return {
     ...emptyExam,
     ...exam,
-    categoryId: getExamCategoryId(exam),
+    categoryId: String(getExamCategoryId(exam) || ""),
     subjectIds: Array.isArray(exam.subjectIds)
       ? exam.subjectIds.map((subjectId) => String(subjectId))
       : [],
@@ -417,9 +430,9 @@ function MultiSelectDropdown({
 
       {selectedOptions.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {selectedOptions.map((option) => (
+          {selectedOptions.map((option, index) => (
             <span
-              key={option.value}
+              key={`selected-${option.value}-${index}`}
               className="inline-flex max-w-full items-center gap-1 rounded-md bg-brand-soft px-2 py-1 text-xs font-bold text-brand-strong"
             >
               <span className="truncate">{option.label}</span>
@@ -465,7 +478,7 @@ function MultiSelectDropdown({
             role="listbox"
           >
             {visibleOptions.length > 0 ? (
-              visibleOptions.map((option) => {
+              visibleOptions.map((option, index) => {
                 const checked = selectedValues.has(option.value);
                 const depth = Math.max(0, Number(option.depth) || 0);
                 const node = nodesByValue.get(option.value) || option;
@@ -474,7 +487,7 @@ function MultiSelectDropdown({
 
                 return (
                   <div
-                    key={option.value}
+                    key={`option-${option.value}-${index}`}
                     role="option"
                     aria-selected={checked}
                     className={`flex min-h-10 items-center gap-2 py-2 pr-3 text-sm transition-colors hover:bg-brand-soft ${
@@ -540,9 +553,11 @@ export function ExamForm({
   categoryIndex,
   categoryOptions,
   exam,
+  isSubmitting = false,
   onSubmit,
   packageOptions = [],
   secondaryAction,
+  showStatusField = true,
   submitLabel = "Create exam",
   subjectIndex,
   topics,
@@ -554,7 +569,7 @@ export function ExamForm({
   const [answerFileInputKey, setAnswerFileInputKey] = useState(0);
 
   const categoryIds = useMemo(
-    () => new Set(categoryOptions.map((option) => option.value)),
+    () => new Set(categoryOptions.map((option) => String(option.value))),
     [categoryOptions],
   );
   const subjectOptions = useMemo(
@@ -562,31 +577,31 @@ export function ExamForm({
     [subjectIndex.childrenMap],
   );
   const subjectIds = useMemo(
-    () => new Set(subjectOptions.map((option) => option.value)),
+    () => new Set(subjectOptions.map((option) => String(option.value))),
     [subjectOptions],
   );
   const topicOptions = useMemo(() => {
     const selectedSubjectIds = new Set();
     form.subjectIds.forEach((subjectId) => {
-      selectedSubjectIds.add(subjectId);
+      selectedSubjectIds.add(String(subjectId));
       getDescendantIds(subjectIndex.childrenMap, subjectId).forEach(
-        (descendantId) => selectedSubjectIds.add(descendantId),
+        (descendantId) => selectedSubjectIds.add(String(descendantId)),
       );
     });
 
-    return sortByName(topics)
-      .filter((topic) => selectedSubjectIds.has(topic.subjectId))
+    return uniqueOptionsByValue(sortByName(topics)
+      .filter((topic) => selectedSubjectIds.has(String(topic.subjectId)))
       .map((topic) => ({
         label: topic.name,
-        value: topic.id,
-      }));
+        value: String(topic.id ?? ""),
+      })));
   }, [
     form.subjectIds,
     subjectIndex.childrenMap,
     topics,
   ]);
   const topicIds = useMemo(
-    () => new Set(topicOptions.map((option) => option.value)),
+    () => new Set(topicOptions.map((option) => String(option.value))),
     [topicOptions],
   );
 
@@ -597,14 +612,16 @@ export function ExamForm({
       if (field === "subjectIds") {
         const selectedSubjectIds = new Set();
         value.forEach((subjectId) => {
-          selectedSubjectIds.add(subjectId);
+          selectedSubjectIds.add(String(subjectId));
           getDescendantIds(subjectIndex.childrenMap, subjectId).forEach(
-            (descendantId) => selectedSubjectIds.add(descendantId),
+            (descendantId) => selectedSubjectIds.add(String(descendantId)),
           );
         });
         nextForm.topicIds = currentForm.topicIds.filter((topicId) => {
-          const topic = topics.find((currentTopic) => currentTopic.id === topicId);
-          return topic && selectedSubjectIds.has(topic.subjectId);
+          const topic = topics.find(
+            (currentTopic) => String(currentTopic.id) === String(topicId),
+          );
+          return topic && selectedSubjectIds.has(String(topic.subjectId));
         });
       }
 
@@ -623,6 +640,7 @@ export function ExamForm({
       ...currentForm,
       [pdfField]: "",
       [nameField]: "",
+      [getPdfFileField(pdfField)]: null,
     }));
   };
 
@@ -655,26 +673,17 @@ export function ExamForm({
       return;
     }
 
-    try {
-      const fileDataUrl = await readFileAsDataUrl(file);
-      setForm((currentForm) => ({
-        ...currentForm,
-        [pdfField]: fileDataUrl,
-        [nameField]: file.name,
-      }));
-      setErrors((currentErrors) => {
-        const nextErrors = { ...currentErrors };
-        delete nextErrors[pdfField];
-        return nextErrors;
-      });
-    } catch {
-      clearPdfField(pdfField, nameField);
-      resetKey((currentKey) => currentKey + 1);
-      setErrors((currentErrors) => ({
-        ...currentErrors,
-        [pdfField]: { message: "The selected PDF could not be read." },
-      }));
-    }
+    setForm((currentForm) => ({
+      ...currentForm,
+      [pdfField]: "",
+      [nameField]: file.name,
+      [getPdfFileField(pdfField)]: file,
+    }));
+    setErrors((currentErrors) => {
+      const nextErrors = { ...currentErrors };
+      delete nextErrors[pdfField];
+      return nextErrors;
+    });
   };
 
   const handleSubmit = (event) => {
@@ -702,7 +711,10 @@ export function ExamForm({
             parentID: category.parentId,
             name: category.name,
             icon: null,
-            status: category.status === "active",
+            status:
+              typeof category.status === "boolean"
+                ? category.status
+                : category.status === "active",
           }
         : undefined,
     });
@@ -853,26 +865,28 @@ export function ExamForm({
             error={errors.expiredTime}
           />
 
-          <div className="field-group rounded-lg border border-border bg-surface-muted px-4 py-3 md:col-span-2">
-            <span className="field-label">Status</span>
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-sm font-medium text-muted">
-                {form.status ? "Active" : "Inactive"}
-              </span>
-              <StatusToggle
-                checked={form.status}
-                label="Set exam active status"
-                onChange={(checked) => updateField("status", checked)}
-              />
+          {showStatusField && (
+            <div className="field-group rounded-lg border border-border bg-surface-muted px-4 py-3 md:col-span-2">
+              <span className="field-label">Status</span>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-sm font-medium text-muted">
+                  {form.status ? "Active" : "Inactive"}
+                </span>
+                <StatusToggle
+                  checked={form.status}
+                  label="Set exam active status"
+                  onChange={(checked) => updateField("status", checked)}
+                />
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </section>
 
       <section className="surface-card p-5">
         <div className="grid gap-4 lg:grid-cols-2">
           <FileUpload
-            key={questionFileInputKey}
+            key={`question-pdf-${questionFileInputKey}`}
             label="Question PDF"
             name="questionPDF"
             accept=".pdf,application/pdf"
@@ -892,7 +906,7 @@ export function ExamForm({
           />
 
           <FileUpload
-            key={answerFileInputKey}
+            key={`answer-pdf-${answerFileInputKey}`}
             label="Demo Answer PDF"
             name="demoAnswerPDF"
             accept=".pdf,application/pdf"
@@ -919,7 +933,11 @@ export function ExamForm({
 
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         {secondaryAction}
-        <button type="submit" className="button button-primary">
+        <button
+          type="submit"
+          className="button button-primary"
+          disabled={isSubmitting}
+        >
           {submitLabel}
         </button>
       </div>

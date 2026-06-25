@@ -1,34 +1,75 @@
 import { ExamFormPage } from "@/features/exams/ExamFormPage";
-import { DEFAULT_EXAM_CATEGORIES } from "@/lib/categoryData";
-import { DEFAULT_EXAMS } from "@/lib/examData";
+import { ssrFetch } from "@/lib/api/ssrFetch";
 import { DEFAULT_PACKAGE_INFO } from "@/lib/packageInfoData";
-import {
-  DEFAULT_EXAM_SUBJECTS,
-  DEFAULT_SUBJECT_TOPICS,
-} from "@/lib/subjectData";
+
+const FIRST_PAGE = 1;
+const LOOKUP_LIMIT = 1000;
+
+function emptyListResponse(key, message) {
+  return {
+    status: 500,
+    message,
+    [key]: [],
+    pagination: {
+      total: 0,
+      page: FIRST_PAGE,
+      limit: LOOKUP_LIMIT,
+      totalPages: 0,
+    },
+    _error: true,
+  };
+}
+
+async function safeSsrFetch(endpoint, key, fallbackMessage) {
+  try {
+    return await ssrFetch(endpoint);
+  } catch (error) {
+    return emptyListResponse(key, error?.message || fallbackMessage);
+  }
+}
 
 async function getCreateExamPageData() {
-  // Replace these mocks with the categories, subjects, topics, and exams API calls when ready.
+  const params = new URLSearchParams({
+    page: String(FIRST_PAGE),
+    limit: String(LOOKUP_LIMIT),
+  });
+
+  const [categoriesData, subjectsData, topicsData] = await Promise.all([
+    safeSsrFetch(
+      `/category/get-all-categories?${params}`,
+      "categories",
+      "Unable to load categories.",
+    ),
+    safeSsrFetch(
+      `/exam/subjects/get-all-subjects?${params}`,
+      "subjects",
+      "Unable to load subjects.",
+    ),
+    safeSsrFetch(
+      `/exam/topics/get-all-topics?${params}`,
+      "topics",
+      "Unable to load topics.",
+    ),
+  ]);
+
   return {
-    categories: DEFAULT_EXAM_CATEGORIES,
-    exams: DEFAULT_EXAMS,
+    categoriesData,
     packages: DEFAULT_PACKAGE_INFO,
-    subjects: DEFAULT_EXAM_SUBJECTS,
-    topics: DEFAULT_SUBJECT_TOPICS,
+    subjectsData,
+    topicsData,
   };
 }
 
 export default async function CreateExamPage() {
-  const { categories, exams, packages, subjects, topics } =
+  const { categoriesData, packages, subjectsData, topicsData } =
     await getCreateExamPageData();
 
   return (
     <ExamFormPage
-      initialCategories={categories}
-      initialExams={exams}
+      initialCategoriesData={categoriesData}
       initialPackages={packages}
-      initialSubjects={subjects}
-      initialTopics={topics}
+      initialSubjectsData={subjectsData}
+      initialTopicsData={topicsData}
       mode="create"
     />
   );

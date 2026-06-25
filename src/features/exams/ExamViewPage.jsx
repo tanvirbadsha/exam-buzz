@@ -1,17 +1,57 @@
 "use client";
 
+import { ErrorCard } from "@/components/ui/ErrorCard";
+import { GlobalSpinner } from "@/components/ui/GlobalSpinner";
+import { categoryApi } from "@/features/categories/api/categoryApi";
+import { useGetExamByIdQuery } from "@/features/exams/exam/api/examApi";
+import {
+  getExamApiErrorMessage,
+  getExamFromResponse,
+  getLookupItemsFromResponse,
+  normalizeExam,
+  normalizeExamCategories,
+  normalizeExamSubjects,
+  normalizeExamTopics,
+} from "@/features/exams/exam/examUtils";
+import { subjectsApi } from "@/features/subjects/api/subjectsApi";
+import { topicsApi } from "@/features/topics/api/topicsApi";
 import { ArrowLeft, Download, Pencil } from "lucide-react";
 import Link from "next/link";
-import { useMemo } from "react";
-import { useCategoryManagement } from "@/hooks/useCategoryManagement";
-import { useExamManagement } from "@/hooks/useExamManagement";
-import { usePackageInfoManagement } from "@/hooks/usePackageInfoManagement";
-import { useSubjectManagement } from "@/hooks/useSubjectManagement";
+import { useEffect, useMemo, useState } from "react";
+import { useDispatch } from "react-redux";
 import {
   formatExamTimeline,
   getExamCategoryId,
   getExamPdfLabel,
 } from "@/lib/examData";
+
+const LOOKUP_LIMIT = 1000;
+const INITIAL_LOOKUP_QUERY_ARGS = {
+  page: 1,
+  limit: LOOKUP_LIMIT,
+};
+
+function buildChildrenMap(items) {
+  const itemIds = new Set(items.map((item) => item.id));
+  const childrenMap = new Map();
+
+  items.forEach((item) => {
+    const parentKey =
+      item.parentId && itemIds.has(item.parentId) ? item.parentId : "root";
+    const children = childrenMap.get(parentKey) || [];
+    children.push(item);
+    childrenMap.set(parentKey, children);
+  });
+
+  return childrenMap;
+}
+
+function buildEntityIndex(items, mapKey) {
+  return {
+    [mapKey]: new Map(items.map((item) => [item.id, item])),
+    childrenMap: buildChildrenMap(items),
+  };
+}
 
 function getPath(itemsById, itemId) {
   const path = [];
@@ -67,28 +107,165 @@ function PdfDetailLink({ href, label }) {
 
 export function ExamViewPage({
   examId,
-  initialCategories,
-  initialExams,
-  initialPackages,
-  initialSubjects,
-  initialTopics,
+  initialCategoriesData,
+  initialPackages = [],
+  initialSubjectsData,
+  initialTopicsData,
 }) {
-  const { categoryIndex } = useCategoryManagement(initialCategories);
-  const { getExamById } = useExamManagement(initialExams);
-  const { packages } = usePackageInfoManagement(initialPackages);
-  const { subjectIndex, topics } = useSubjectManagement(
-    initialSubjects,
-    initialTopics,
+  const dispatch = useDispatch();
+  const [hasHydratedInitialData, setHasHydratedInitialData] = useState(
+    () =>
+      !initialCategoriesData ||
+      !initialSubjectsData ||
+      !initialTopicsData ||
+      Boolean(
+        initialCategoriesData?._error ||
+          initialSubjectsData?._error ||
+          initialTopicsData?._error,
+      ),
   );
-  const exam = getExamById(examId);
+
+  useEffect(() => {
+    if (!initialCategoriesData || !initialSubjectsData || !initialTopicsData) {
+      return;
+    }
+
+    if (!initialCategoriesData._error) {
+      dispatch(
+        categoryApi.util.upsertQueryData(
+          "getAllCategories",
+          INITIAL_LOOKUP_QUERY_ARGS,
+          initialCategoriesData,
+        ),
+      );
+    }
+
+    if (!initialSubjectsData._error) {
+      dispatch(
+        subjectsApi.util.upsertQueryData(
+          "getAllSubject",
+          INITIAL_LOOKUP_QUERY_ARGS,
+          initialSubjectsData,
+        ),
+      );
+    }
+
+    if (!initialTopicsData._error) {
+      dispatch(
+        topicsApi.util.upsertQueryData(
+          "getAllTopics",
+          INITIAL_LOOKUP_QUERY_ARGS,
+          initialTopicsData,
+        ),
+      );
+    }
+
+    queueMicrotask(() => setHasHydratedInitialData(true));
+  }, [dispatch, initialCategoriesData, initialSubjectsData, initialTopicsData]);
+
+  const shouldUseInitialLookupData =
+    !hasHydratedInitialData &&
+    Boolean(initialCategoriesData && initialSubjectsData && initialTopicsData);
+  const {
+    data: examData,
+    error: examError,
+    isUninitialized: isExamUninitialized,
+    isLoading: isLoadingExam,
+    isFetching: isFetchingExam,
+    refetch: refetchExam,
+  } = useGetExamByIdQuery(examId, {
+    skip: !examId,
+  });
+  const { data: queryCategoriesData } =
+    categoryApi.useGetAllCategoriesQuery(INITIAL_LOOKUP_QUERY_ARGS, {
+      skip: shouldUseInitialLookupData && !initialCategoriesData?._error,
+      placeholderData:
+        shouldUseInitialLookupData && !initialCategoriesData?._error
+          ? initialCategoriesData
+          : undefined,
+    });
+  const { data: querySubjectsData } =
+    subjectsApi.useGetAllSubjectQuery(INITIAL_LOOKUP_QUERY_ARGS, {
+      skip: shouldUseInitialLookupData && !initialSubjectsData?._error,
+      placeholderData:
+        shouldUseInitialLookupData && !initialSubjectsData?._error
+          ? initialSubjectsData
+          : undefined,
+    });
+  const { data: queryTopicsData } =
+    topicsApi.useGetAllTopicsQuery(INITIAL_LOOKUP_QUERY_ARGS, {
+      skip: shouldUseInitialLookupData && !initialTopicsData?._error,
+      placeholderData:
+        shouldUseInitialLookupData && !initialTopicsData?._error
+          ? initialTopicsData
+          : undefined,
+    });
+
+  const categoriesData =
+    shouldUseInitialLookupData && !initialCategoriesData?._error
+      ? initialCategoriesData
+      : queryCategoriesData;
+  const subjectsData =
+    shouldUseInitialLookupData && !initialSubjectsData?._error
+      ? initialSubjectsData
+      : querySubjectsData;
+  const topicsData =
+    shouldUseInitialLookupData && !initialTopicsData?._error
+      ? initialTopicsData
+      : queryTopicsData;
+  const exam = normalizeExam(getExamFromResponse(examData));
+  const categories = useMemo(
+    () =>
+      normalizeExamCategories(
+        getLookupItemsFromResponse(categoriesData, "categories"),
+      ),
+    [categoriesData],
+  );
+  const subjects = useMemo(
+    () =>
+      normalizeExamSubjects(getLookupItemsFromResponse(subjectsData, "subjects")),
+    [subjectsData],
+  );
+  const topics = useMemo(
+    () => normalizeExamTopics(getLookupItemsFromResponse(topicsData, "topics")),
+    [topicsData],
+  );
+  const categoryIndex = useMemo(
+    () => buildEntityIndex(categories, "categoriesById"),
+    [categories],
+  );
+  const subjectIndex = useMemo(
+    () => buildEntityIndex(subjects, "subjectsById"),
+    [subjects],
+  );
   const packageById = useMemo(
-    () => new Map(packages.map((packageInfo) => [packageInfo.id, packageInfo])),
-    [packages],
+    () =>
+      new Map(
+        initialPackages.map((packageInfo) => [String(packageInfo.id), packageInfo]),
+      ),
+    [initialPackages],
   );
   const topicsById = useMemo(
     () => new Map(topics.map((topic) => [topic.id, topic])),
     [topics],
   );
+
+  if ((isExamUninitialized || isLoadingExam || isFetchingExam) && !exam) {
+    return <GlobalSpinner label="Loading exam details..." />;
+  }
+
+  if (examError && !exam) {
+    return (
+      <ErrorCard
+        title="Unable to load exam"
+        message={getExamApiErrorMessage(
+          examError,
+          "The selected exam could not be loaded.",
+        )}
+        onRetry={refetchExam}
+      />
+    );
+  }
 
   if (!exam) {
     return (

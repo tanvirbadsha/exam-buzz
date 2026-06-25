@@ -1,30 +1,93 @@
 import { ExamManager } from "@/features/exams/ExamManager";
-import { DEFAULT_EXAM_CATEGORIES } from "@/lib/categoryData";
-import { DEFAULT_EXAMS } from "@/lib/examData";
-import {
-  DEFAULT_EXAM_SUBJECTS,
-  DEFAULT_SUBJECT_TOPICS,
-} from "@/lib/subjectData";
+import { ssrFetch } from "@/lib/api/ssrFetch";
+
+const FIRST_PAGE = 1;
+const EXAM_LIST_LIMIT = 1000;
+const LOOKUP_LIMIT = 1000;
+
+function emptyListResponse(key, message, limit) {
+  return {
+    status: 500,
+    message,
+    [key]: [],
+    pagination: {
+      total: 0,
+      page: FIRST_PAGE,
+      limit,
+      totalPages: 0,
+    },
+    _error: true,
+  };
+}
+
+async function safeSsrFetch(endpoint, key, fallbackMessage, limit) {
+  try {
+    return await ssrFetch(endpoint);
+  } catch (error) {
+    return emptyListResponse(
+      key,
+      error?.message || fallbackMessage,
+      limit,
+    );
+  }
+}
 
 async function getExamPageData() {
-  // Replace these mocks with the exams, categories, subjects, and topics API calls when ready.
+  const examParams = new URLSearchParams({
+    page: String(FIRST_PAGE),
+    limit: String(EXAM_LIST_LIMIT),
+  });
+  const lookupParams = new URLSearchParams({
+    page: String(FIRST_PAGE),
+    limit: String(LOOKUP_LIMIT),
+  });
+
+  const [examsData, categoriesData, subjectsData, topicsData] =
+    await Promise.all([
+      safeSsrFetch(
+        `/exam/exams/get-all-exams?${examParams}`,
+        "exams",
+        "Unable to load exams.",
+        EXAM_LIST_LIMIT,
+      ),
+      safeSsrFetch(
+        `/category/get-all-categories?${lookupParams}`,
+        "categories",
+        "Unable to load categories.",
+        LOOKUP_LIMIT,
+      ),
+      safeSsrFetch(
+        `/exam/subjects/get-all-subjects?${lookupParams}`,
+        "subjects",
+        "Unable to load subjects.",
+        LOOKUP_LIMIT,
+      ),
+      safeSsrFetch(
+        `/exam/topics/get-all-topics?${lookupParams}`,
+        "topics",
+        "Unable to load topics.",
+        LOOKUP_LIMIT,
+      ),
+    ]);
+
   return {
-    categories: DEFAULT_EXAM_CATEGORIES,
-    exams: DEFAULT_EXAMS,
-    subjects: DEFAULT_EXAM_SUBJECTS,
-    topics: DEFAULT_SUBJECT_TOPICS,
+    categoriesData,
+    examsData,
+    subjectsData,
+    topicsData,
   };
 }
 
 export default async function ExamsPage() {
-  const { categories, exams, subjects, topics } = await getExamPageData();
+  const { categoriesData, examsData, subjectsData, topicsData } =
+    await getExamPageData();
 
   return (
     <ExamManager
-      initialCategories={categories}
-      initialExams={exams}
-      initialSubjects={subjects}
-      initialTopics={topics}
+      initialCategoriesData={categoriesData}
+      initialExamsData={examsData}
+      initialSubjectsData={subjectsData}
+      initialTopicsData={topicsData}
     />
   );
 }

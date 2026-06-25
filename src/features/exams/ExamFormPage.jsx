@@ -1,19 +1,87 @@
 "use client";
 
+import { ErrorCard } from "@/components/ui/ErrorCard";
+import { GlobalSpinner } from "@/components/ui/GlobalSpinner";
+import { categoryApi } from "@/features/categories/api/categoryApi";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import { useDispatch } from "react-redux";
 import { ExamForm } from "@/features/exams/ExamForm";
-import { useCategoryManagement } from "@/hooks/useCategoryManagement";
-import { useExamManagement } from "@/hooks/useExamManagement";
-import { useSubjectManagement } from "@/hooks/useSubjectManagement";
+import {
+  useCreateExamMutation,
+  useGetExamByIdQuery,
+  useUpdateExamMutation,
+} from "@/features/exams/exam/api/examApi";
+import {
+  buildExamCreateBody,
+  buildExamUpdateBody,
+  getExamApiErrorMessage,
+  getExamFromResponse,
+  getLookupItemsFromResponse,
+  hasObjectEntries,
+  normalizeExam,
+  normalizeExamCategories,
+  normalizeExamSubjects,
+  normalizeExamTopics,
+} from "@/features/exams/exam/examUtils";
+import { subjectsApi } from "@/features/subjects/api/subjectsApi";
+import { topicsApi } from "@/features/topics/api/topicsApi";
+
+const LOOKUP_LIMIT = 1000;
+const INITIAL_LOOKUP_QUERY_ARGS = {
+  page: 1,
+  limit: LOOKUP_LIMIT,
+};
 
 function sortByName(items) {
   return [...items].sort((firstItem, secondItem) =>
     firstItem.name.localeCompare(secondItem.name),
   );
+}
+
+function buildChildrenMap(items) {
+  const itemIds = new Set(items.map((item) => item.id));
+  const childrenMap = new Map();
+
+  items.forEach((item) => {
+    const parentKey =
+      item.parentId && itemIds.has(item.parentId) ? item.parentId : "root";
+    const children = childrenMap.get(parentKey) || [];
+    children.push(item);
+    childrenMap.set(parentKey, children);
+  });
+
+  return childrenMap;
+}
+
+function buildEntityIndex(items, mapKey) {
+  const itemsById = new Map();
+
+  items.forEach((item) => {
+    if (!item?.id || itemsById.has(String(item.id))) return;
+    itemsById.set(String(item.id), item);
+  });
+
+  const uniqueItems = Array.from(itemsById.values());
+
+  return {
+    [mapKey]: new Map(uniqueItems.map((item) => [item.id, item])),
+    childrenMap: buildChildrenMap(uniqueItems),
+  };
+}
+
+function uniqueOptionsByValue(options) {
+  const seenValues = new Set();
+
+  return options.filter((option) => {
+    const value = String(option.value ?? "");
+    if (!value || seenValues.has(value)) return false;
+    seenValues.add(value);
+    return true;
+  });
 }
 
 function buildCategoryOptions(childrenMap) {
@@ -36,61 +104,267 @@ function buildCategoryOptions(childrenMap) {
   };
 
   walk();
-  return options;
+  return uniqueOptionsByValue(options);
 }
 
 export function ExamFormPage({
   examId,
-  initialCategories,
-  initialExams,
+  initialCategoriesData,
   initialPackages = [],
-  initialSubjects,
-  initialTopics,
+  initialSubjectsData,
+  initialTopicsData,
   mode = "create",
 }) {
   const router = useRouter();
-  const { categoryIndex } = useCategoryManagement(initialCategories);
-  const { createExam, getExamById, updateExam } =
-    useExamManagement(initialExams);
-  const { subjectIndex, topics } = useSubjectManagement(
-    initialSubjects,
-    initialTopics,
+  const dispatch = useDispatch();
+  const isEditMode = mode === "edit";
+  const [hasHydratedInitialData, setHasHydratedInitialData] = useState(
+    () =>
+      !initialCategoriesData ||
+      !initialSubjectsData ||
+      !initialTopicsData ||
+      Boolean(
+        initialCategoriesData?._error ||
+          initialSubjectsData?._error ||
+          initialTopicsData?._error,
+      ),
+  );
+
+  useEffect(() => {
+    if (!initialCategoriesData || !initialSubjectsData || !initialTopicsData) {
+      return;
+    }
+
+    if (!initialCategoriesData._error) {
+      dispatch(
+        categoryApi.util.upsertQueryData(
+          "getAllCategories",
+          INITIAL_LOOKUP_QUERY_ARGS,
+          initialCategoriesData,
+        ),
+      );
+    }
+
+    if (!initialSubjectsData._error) {
+      dispatch(
+        subjectsApi.util.upsertQueryData(
+          "getAllSubject",
+          INITIAL_LOOKUP_QUERY_ARGS,
+          initialSubjectsData,
+        ),
+      );
+    }
+
+    if (!initialTopicsData._error) {
+      dispatch(
+        topicsApi.util.upsertQueryData(
+          "getAllTopics",
+          INITIAL_LOOKUP_QUERY_ARGS,
+          initialTopicsData,
+        ),
+      );
+    }
+
+    queueMicrotask(() => setHasHydratedInitialData(true));
+  }, [dispatch, initialCategoriesData, initialSubjectsData, initialTopicsData]);
+
+  const shouldUseInitialLookupData =
+    !hasHydratedInitialData &&
+    Boolean(initialCategoriesData && initialSubjectsData && initialTopicsData);
+
+  const {
+    data: queryCategoriesData,
+    error: categoriesError,
+    isLoading: isLoadingCategories,
+    refetch: refetchCategories,
+  } = categoryApi.useGetAllCategoriesQuery(INITIAL_LOOKUP_QUERY_ARGS, {
+    skip: shouldUseInitialLookupData && !initialCategoriesData?._error,
+    placeholderData:
+      shouldUseInitialLookupData && !initialCategoriesData?._error
+        ? initialCategoriesData
+        : undefined,
+  });
+  const {
+    data: querySubjectsData,
+    error: subjectsError,
+    isLoading: isLoadingSubjects,
+    refetch: refetchSubjects,
+  } = subjectsApi.useGetAllSubjectQuery(INITIAL_LOOKUP_QUERY_ARGS, {
+    skip: shouldUseInitialLookupData && !initialSubjectsData?._error,
+    placeholderData:
+      shouldUseInitialLookupData && !initialSubjectsData?._error
+        ? initialSubjectsData
+        : undefined,
+  });
+  const {
+    data: queryTopicsData,
+    error: topicsError,
+    isLoading: isLoadingTopics,
+    refetch: refetchTopics,
+  } = topicsApi.useGetAllTopicsQuery(INITIAL_LOOKUP_QUERY_ARGS, {
+    skip: shouldUseInitialLookupData && !initialTopicsData?._error,
+    placeholderData:
+      shouldUseInitialLookupData && !initialTopicsData?._error
+        ? initialTopicsData
+        : undefined,
+  });
+  const {
+    data: examData,
+    error: examError,
+    isLoading: isLoadingExam,
+    refetch: refetchExam,
+  } = useGetExamByIdQuery(examId, {
+    skip: !isEditMode || !examId,
+  });
+  const [createExam, { isLoading: isCreating }] = useCreateExamMutation();
+  const [updateExam, { isLoading: isUpdating }] = useUpdateExamMutation();
+
+  const categoriesData =
+    shouldUseInitialLookupData && !initialCategoriesData?._error
+      ? initialCategoriesData
+      : queryCategoriesData;
+  const subjectsData =
+    shouldUseInitialLookupData && !initialSubjectsData?._error
+      ? initialSubjectsData
+      : querySubjectsData;
+  const topicsData =
+    shouldUseInitialLookupData && !initialTopicsData?._error
+      ? initialTopicsData
+      : queryTopicsData;
+
+  const categories = useMemo(
+    () =>
+      normalizeExamCategories(
+        getLookupItemsFromResponse(categoriesData, "categories"),
+      ),
+    [categoriesData],
+  );
+  const subjects = useMemo(
+    () =>
+      normalizeExamSubjects(getLookupItemsFromResponse(subjectsData, "subjects")),
+    [subjectsData],
+  );
+  const topics = useMemo(
+    () => normalizeExamTopics(getLookupItemsFromResponse(topicsData, "topics")),
+    [topicsData],
+  );
+  const categoryIndex = useMemo(
+    () => buildEntityIndex(categories, "categoriesById"),
+    [categories],
+  );
+  const subjectIndex = useMemo(
+    () => buildEntityIndex(subjects, "subjectsById"),
+    [subjects],
   );
   const categoryOptions = useMemo(
     () => buildCategoryOptions(categoryIndex.childrenMap),
     [categoryIndex.childrenMap],
   );
   const packageOptions = useMemo(
-    () => [
-      { label: "No package", value: "" },
-      ...initialPackages.map((packageInfo) => ({
+    () => {
+      const staticOptions = [
+        { label: "No package", value: "__no_package__" },
+        ...initialPackages.map((packageInfo, index) => ({
         label: packageInfo.title,
-        value: packageInfo.id,
+        value: packageInfo.id ?? `package-${index}`,
         meta: packageInfo.status,
         searchText: `${packageInfo.title} ${packageInfo.status} ${packageInfo.packageType}`,
       })),
-    ],
+      ];
+
+      return uniqueOptionsByValue(staticOptions);
+    },
     [initialPackages],
   );
-  const exam = mode === "edit" ? getExamById(examId) : null;
-  const isLoadedForEdit = mode !== "edit" || Boolean(exam);
+  const exam = isEditMode ? normalizeExam(getExamFromResponse(examData)) : null;
 
-  const handleSubmit = (examInput) => {
-    if (mode === "edit" && exam) {
-      const updatedExam = updateExam(exam.id, examInput);
-      if (updatedExam) {
+  const handleSubmit = async (examInput) => {
+    if (isEditMode && exam) {
+      const body = buildExamUpdateBody(examInput, exam);
+
+      if (!hasObjectEntries(body)) {
+        toast.success("No exam changes to save.");
+        return;
+      }
+
+      try {
+        const response = await updateExam({ id: exam.id, body }).unwrap();
+        const updatedExam = normalizeExam(getExamFromResponse(response)) || exam;
         toast.success(`${updatedExam.name} updated.`);
         router.push("/exams");
+      } catch (updateError) {
+        toast.error(
+          getExamApiErrorMessage(updateError, "Failed to update exam."),
+        );
       }
+
       return;
     }
 
-    const createdExam = createExam(examInput);
-    toast.success(`${createdExam.name} created.`);
-    router.push("/exams");
+    try {
+      const response = await createExam(buildExamCreateBody(examInput)).unwrap();
+      const createdExam =
+        normalizeExam(getExamFromResponse(response)) || examInput;
+      toast.success(`${createdExam.name} created.`);
+      router.push("/exams");
+    } catch (createError) {
+      toast.error(
+        getExamApiErrorMessage(createError, "Failed to create exam."),
+      );
+    }
   };
 
-  if (!isLoadedForEdit) {
+  const activeInitialError =
+    (!queryCategoriesData &&
+      initialCategoriesData?._error &&
+      initialCategoriesData) ||
+    (!querySubjectsData && initialSubjectsData?._error && initialSubjectsData) ||
+    (!queryTopicsData && initialTopicsData?._error && initialTopicsData) ||
+    null;
+  const activeError =
+    categoriesError ||
+    subjectsError ||
+    topicsError ||
+    (isEditMode ? examError : null) ||
+    activeInitialError;
+  const hasRequiredLookups =
+    Boolean(categoriesData && !categoriesData._error) &&
+    Boolean(subjectsData && !subjectsData._error) &&
+    Boolean(topicsData && !topicsData._error);
+  const isLoadingRequiredData =
+    isLoadingCategories ||
+    isLoadingSubjects ||
+    isLoadingTopics ||
+    !hasHydratedInitialData ||
+    (isEditMode && isLoadingExam);
+
+  const refetchAll = () => {
+    refetchCategories();
+    refetchSubjects();
+    refetchTopics();
+    if (isEditMode && examId) {
+      refetchExam();
+    }
+  };
+
+  if (isLoadingRequiredData && (!hasRequiredLookups || (isEditMode && !exam))) {
+    return <GlobalSpinner label="Loading exam form..." />;
+  }
+
+  if (activeError && (!hasRequiredLookups || (isEditMode && !exam))) {
+    return (
+      <ErrorCard
+        title={isEditMode ? "Unable to load exam" : "Unable to load form data"}
+        message={getExamApiErrorMessage(
+          activeError,
+          "The exam form data could not be loaded.",
+        )}
+        onRetry={refetchAll}
+      />
+    );
+  }
+
+  if (isEditMode && !exam) {
     return (
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
         <Link href="/exams" className="back-link">
@@ -128,8 +402,10 @@ export function ExamFormPage({
         categoryIndex={categoryIndex}
         categoryOptions={categoryOptions}
         exam={exam}
+        isSubmitting={isCreating || isUpdating}
         onSubmit={handleSubmit}
         packageOptions={packageOptions}
+        showStatusField={!isEditMode}
         submitLabel={mode === "edit" ? "Save changes" : "Create exam"}
         subjectIndex={subjectIndex}
         topics={topics}

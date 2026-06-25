@@ -259,7 +259,7 @@ export function CustomDropdown({
                 return (
                   <button
                     type="button"
-                    key={option.value}
+                    key={`${option.value}-${index}`}
                     role="option"
                     aria-selected={isSelected}
                     onMouseEnter={() => setHighlightedIndex(index)}
