@@ -11,9 +11,12 @@ export const examApi = apiSlice.injectEndpoints({
       invalidatesTags: [{ type: "Exam", id: "LIST" }],
     }),
     getAllExams: builder.query({
-      query: ({ search, page, limit } = {}) => {
+      query: ({ search, page, limit, categoryID, subjectID, topicID } = {}) => {
         const params = new URLSearchParams();
         if (search) params.append("search", search);
+        if (categoryID) params.append("categoryID", categoryID.toString());
+        if (subjectID) params.append("subjectID", subjectID.toString());
+        if (topicID) params.append("topicID", topicID.toString());
         if (page) params.append("page", page.toString());
         if (limit) params.append("limit", limit.toString());
 
@@ -34,9 +37,12 @@ export const examApi = apiSlice.injectEndpoints({
       ],
     }),
     getUpcomingExams: builder.query({
-      query: ({ search, page, limit } = {}) => {
+      query: ({ search, page, limit, categoryID, subjectID, topicID } = {}) => {
         const params = new URLSearchParams();
         if (search) params.append("search", search);
+        if (categoryID) params.append("categoryID", categoryID.toString());
+        if (subjectID) params.append("subjectID", subjectID.toString());
+        if (topicID) params.append("topicID", topicID.toString());
         if (page) params.append("page", page.toString());
         if (limit) params.append("limit", limit.toString());
 
@@ -57,9 +63,12 @@ export const examApi = apiSlice.injectEndpoints({
       ],
     }),
     getLiveExams: builder.query({
-      query: ({ search, page, limit } = {}) => {
+      query: ({ search, page, limit, categoryID, subjectID, topicID } = {}) => {
         const params = new URLSearchParams();
         if (search) params.append("search", search);
+        if (categoryID) params.append("categoryID", categoryID.toString());
+        if (subjectID) params.append("subjectID", subjectID.toString());
+        if (topicID) params.append("topicID", topicID.toString());
         if (page) params.append("page", page.toString());
         if (limit) params.append("limit", limit.toString());
 
@@ -173,6 +182,8 @@ export const examApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { id }) => [
         { type: "Exam", id: "LIST" },
+        { type: "Exam", id: "UPCOMING" },
+        { type: "Exam", id: "LIVE" },
         { type: "Exam", id: String(id) },
       ],
     }),
@@ -184,6 +195,8 @@ export const examApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { id }) => [
         { type: "Exam", id: "LIST" },
+        { type: "Exam", id: "UPCOMING" },
+        { type: "Exam", id: "LIVE" },
         { type: "Exam", id: String(id) },
       ],
     }),

@@ -1,8 +1,10 @@
 "use client";
 
 import {
+  ChevronDown,
   Download,
   Eye,
+  FilePenLine,
   Pencil,
   Plus,
   RotateCcw,
@@ -10,7 +12,8 @@ import {
   Trash2,
 } from "lucide-react";
 import Link from "next/link";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import {
   Table,
@@ -31,6 +34,8 @@ import {
   examApi,
   useDeleteExamMutation,
   useGetAllExamsQuery,
+  useGetLiveExamsQuery,
+  useGetUpcomingExamsQuery,
   useUpdateExamStatusMutation,
 } from "@/features/exams/exam/api/examApi";
 import {
@@ -65,6 +70,34 @@ const INITIAL_LOOKUP_QUERY_ARGS = {
   page: 1,
   limit: LOOKUP_LIMIT,
 };
+const ALL_EXAM_TOPIC_VALUE = "__all_exam_topics__";
+
+const EXAM_PAGE_CONFIG = {
+  all: {
+    title: "All Exams",
+    statLabel: "Exams",
+    listLabel: "All exam list",
+    emptyMessage: "Adjust the filters or create a new exam.",
+    queryEndpointName: "getAllExams",
+    useQuery: useGetAllExamsQuery,
+  },
+  upcoming: {
+    title: "Upcoming Exams",
+    statLabel: "Upcoming",
+    listLabel: "Upcoming exam list",
+    emptyMessage: "Adjust the filters or create a new exam.",
+    queryEndpointName: "getUpcomingExams",
+    useQuery: useGetUpcomingExamsQuery,
+  },
+  live: {
+    title: "Live Exams",
+    statLabel: "Live",
+    listLabel: "Live exam list",
+    emptyMessage: "Adjust the filters or create a new exam.",
+    queryEndpointName: "getLiveExams",
+    useQuery: useGetLiveExamsQuery,
+  },
+};
 
 function sortByName(items) {
   return [...items].sort((firstItem, secondItem) =>
@@ -93,6 +126,29 @@ function buildTreeOptions(childrenMap, includeAllOption, allOption) {
 
   walk();
   return options;
+}
+
+function buildTopicOptions(topics, subjectsById) {
+  return [
+    {
+      label: "All topics",
+      value: ALL_EXAM_TOPIC_VALUE,
+      depth: 0,
+      meta: "All topics",
+      searchText: "all topics",
+    },
+    ...sortByName(topics).map((topic) => {
+      const subjectName = subjectsById.get(topic.subjectId)?.name || "";
+
+      return {
+        label: topic.name,
+        value: topic.id,
+        depth: 0,
+        meta: subjectName || "No subject",
+        searchText: `${topic.name} ${subjectName}`,
+      };
+    }),
+  ];
 }
 
 function getDescendantIds(childrenMap, itemId) {
@@ -227,16 +283,65 @@ function ExamActionMenu({ exam, onDelete }) {
   );
 }
 
+function CreateExamMenu() {
+  return (
+    <FloatingActionMenu
+      ariaLabel="Choose exam type"
+      menuHeight={96}
+      triggerClassName="button button-primary min-h-11 md:self-end"
+      triggerContent={
+        <>
+          <Plus size={16} />
+          Create exam
+          <ChevronDown size={15} />
+        </>
+      }
+    >
+      {({ closeMenu }) => (
+        <>
+          <Link
+            href="/exams/create-written-exam"
+            role="menuitem"
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted"
+            onClick={closeMenu}
+          >
+            <FilePenLine size={15} className="text-muted" />
+            Written exam
+          </Link>
+          <Link
+            href="/exams/create-mcq-exam"
+            role="menuitem"
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted"
+            onClick={closeMenu}
+          >
+            <Pencil size={15} className="text-muted" />
+            MCQ Exam
+          </Link>
+        </>
+      )}
+    </FloatingActionMenu>
+  );
+}
+
 export function ExamManager({
+  examListType = "all",
   initialCategoriesData,
   initialExamsData,
   initialSubjectsData,
   initialTopicsData,
 }) {
   const dispatch = useDispatch();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState(ALL_EXAM_CATEGORY_VALUE);
-  const [subjectFilter, setSubjectFilter] = useState(ALL_EXAM_SUBJECT_VALUE);
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [, startTransition] = useTransition();
+  const pageConfig = EXAM_PAGE_CONFIG[examListType] || EXAM_PAGE_CONFIG.all;
+  const useExamListQuery = pageConfig.useQuery;
+  const searchQuery = searchParams.get("search") || "";
+  const categoryFilter =
+    searchParams.get("categoryID") || ALL_EXAM_CATEGORY_VALUE;
+  const subjectFilter = searchParams.get("subjectID") || ALL_EXAM_SUBJECT_VALUE;
+  const topicFilter = searchParams.get("topicID") || ALL_EXAM_TOPIC_VALUE;
   const [pendingStatusIds, setPendingStatusIds] = useState(() => new Set());
   const [hasHydratedInitialData, setHasHydratedInitialData] = useState(
     () =>
@@ -251,7 +356,6 @@ export function ExamManager({
           initialTopicsData?._error,
       ),
   );
-  const deferredSearchQuery = useDeferredValue(searchQuery);
 
   useEffect(() => {
     if (
@@ -266,7 +370,7 @@ export function ExamManager({
     if (!initialExamsData._error) {
       dispatch(
         examApi.util.upsertQueryData(
-          "getAllExams",
+          pageConfig.queryEndpointName,
           INITIAL_EXAM_QUERY_ARGS,
           initialExamsData,
         ),
@@ -310,6 +414,7 @@ export function ExamManager({
     initialExamsData,
     initialSubjectsData,
     initialTopicsData,
+    pageConfig.queryEndpointName,
   ]);
 
   const shouldUseInitialData =
@@ -320,6 +425,36 @@ export function ExamManager({
         initialSubjectsData &&
         initialTopicsData,
     );
+  const examQueryArgs = useMemo(() => {
+    const args = {
+      search: searchQuery.trim(),
+      page: 1,
+      limit: EXAM_LIST_LIMIT,
+    };
+
+    if (categoryFilter !== ALL_EXAM_CATEGORY_VALUE) {
+      args.categoryID = categoryFilter;
+    }
+
+    if (subjectFilter !== ALL_EXAM_SUBJECT_VALUE) {
+      args.subjectID = subjectFilter;
+    }
+
+    if (topicFilter !== ALL_EXAM_TOPIC_VALUE) {
+      args.topicID = topicFilter;
+    }
+
+    return args;
+  }, [categoryFilter, searchQuery, subjectFilter, topicFilter]);
+  const isDefaultExamQuery =
+    examQueryArgs.search === INITIAL_EXAM_QUERY_ARGS.search &&
+    examQueryArgs.page === INITIAL_EXAM_QUERY_ARGS.page &&
+    examQueryArgs.limit === INITIAL_EXAM_QUERY_ARGS.limit &&
+    !examQueryArgs.categoryID &&
+    !examQueryArgs.subjectID &&
+    !examQueryArgs.topicID;
+  const canUseInitialExamsData =
+    shouldUseInitialData && !initialExamsData?._error && isDefaultExamQuery;
 
   const {
     data: queryExamsData,
@@ -327,10 +462,10 @@ export function ExamManager({
     isLoading: isLoadingExams,
     isFetching: isFetchingExams,
     refetch: refetchExams,
-  } = useGetAllExamsQuery(INITIAL_EXAM_QUERY_ARGS, {
-    skip: shouldUseInitialData && !initialExamsData?._error,
+  } = useExamListQuery(examQueryArgs, {
+    skip: canUseInitialExamsData,
     placeholderData:
-      shouldUseInitialData && !initialExamsData?._error
+      canUseInitialExamsData
         ? initialExamsData
         : undefined,
   });
@@ -377,7 +512,7 @@ export function ExamManager({
   const [updateExamStatus] = useUpdateExamStatusMutation();
 
   const examsData =
-    shouldUseInitialData && !initialExamsData?._error
+    canUseInitialExamsData
       ? initialExamsData
       : queryExamsData;
   const categoriesData =
@@ -448,6 +583,10 @@ export function ExamManager({
     () => new Map(topics.map((topic) => [topic.id, topic])),
     [topics],
   );
+  const topicFilterOptions = useMemo(
+    () => buildTopicOptions(topics, subjectIndex.subjectsById),
+    [subjectIndex.subjectsById, topics],
+  );
   const pagination = getExamPagination(examsData, exams.length);
   const totals = useMemo(
     () => ({
@@ -459,7 +598,7 @@ export function ExamManager({
   );
 
   const filteredExams = useMemo(() => {
-    const query = deferredSearchQuery.trim().toLowerCase();
+    const query = searchQuery.trim().toLowerCase();
     const categoryIds =
       categoryFilter === ALL_EXAM_CATEGORY_VALUE
         ? null
@@ -468,6 +607,8 @@ export function ExamManager({
       subjectFilter === ALL_EXAM_SUBJECT_VALUE
         ? null
         : getDescendantIds(subjectIndex.childrenMap, subjectFilter);
+    const selectedTopicId =
+      topicFilter === ALL_EXAM_TOPIC_VALUE ? null : String(topicFilter);
 
     if (categoryIds) categoryIds.add(categoryFilter);
     if (subjectIds) subjectIds.add(subjectFilter);
@@ -506,23 +647,45 @@ export function ExamManager({
       const matchesSubject =
         !subjectIds ||
         examSubjectIds.some((subjectId) => subjectIds.has(subjectId));
-      return matchesSearch && matchesCategory && matchesSubject;
+      const matchesTopic =
+        !selectedTopicId || examTopicIds.includes(selectedTopicId);
+      return matchesSearch && matchesCategory && matchesSubject && matchesTopic;
     });
   }, [
     categoryFilter,
     categoryIndex.childrenMap,
-    deferredSearchQuery,
     exams,
+    searchQuery,
     subjectFilter,
     subjectIndex.childrenMap,
     subjectIndex.subjectsById,
+    topicFilter,
     topicsById,
   ]);
 
+  const updateUrlFilters = (updates) => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value) {
+        nextParams.set(key, value);
+      } else {
+        nextParams.delete(key);
+      }
+    });
+
+    startTransition(() => {
+      const queryString = nextParams.toString();
+      router.replace(queryString ? `${pathname}?${queryString}` : pathname, {
+        scroll: false,
+      });
+    });
+  };
+
   const resetFilters = () => {
-    setSearchQuery("");
-    setCategoryFilter(ALL_EXAM_CATEGORY_VALUE);
-    setSubjectFilter(ALL_EXAM_SUBJECT_VALUE);
+    startTransition(() => {
+      router.replace(pathname, { scroll: false });
+    });
   };
 
   const handleDelete = async (exam) => {
@@ -628,13 +791,15 @@ export function ExamManager({
             Exam operations
           </p>
           <h1 className="mt-1 text-2xl font-black text-foreground sm:text-3xl">
-            Exams
+            {pageConfig.title}
           </h1>
         </div>
 
         <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
           <div className="border-r border-border px-5 py-5">
-            <p className="text-xs font-semibold text-muted">Exams</p>
+            <p className="text-xs font-semibold text-muted">
+              {pageConfig.statLabel}
+            </p>
             <p className="mt-2 text-2xl font-black text-foreground">
               {totals.total}
             </p>
@@ -655,7 +820,7 @@ export function ExamManager({
       </section>
 
       <section className="surface-card p-4">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1fr)_minmax(13rem,16rem)_minmax(13rem,16rem)_auto_auto] xl:items-end">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1fr)_minmax(12rem,15rem)_minmax(12rem,15rem)_minmax(12rem,15rem)_auto_auto] xl:items-end">
           <label className="field-group min-w-0">
             <span className="field-label">Search exams</span>
             <span className="field-shell px-3">
@@ -663,7 +828,9 @@ export function ExamManager({
               <input
                 type="search"
                 value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
+                onChange={(event) =>
+                  updateUrlFilters({ search: event.target.value.trimStart() })
+                }
                 className="field-input"
                 placeholder="Search by name, subject, topic..."
                 aria-label="Search exams"
@@ -675,7 +842,12 @@ export function ExamManager({
             label="Category"
             options={categoryFilterOptions}
             value={categoryFilter}
-            onChange={(option) => setCategoryFilter(option.value)}
+            onChange={(option) =>
+              updateUrlFilters({
+                categoryID:
+                  option.value === ALL_EXAM_CATEGORY_VALUE ? "" : option.value,
+              })
+            }
             placeholder="All categories"
             searchPlaceholder="Search categories..."
           />
@@ -684,9 +856,28 @@ export function ExamManager({
             label="Subject"
             options={subjectFilterOptions}
             value={subjectFilter}
-            onChange={(option) => setSubjectFilter(option.value)}
+            onChange={(option) =>
+              updateUrlFilters({
+                subjectID:
+                  option.value === ALL_EXAM_SUBJECT_VALUE ? "" : option.value,
+              })
+            }
             placeholder="All subjects"
             searchPlaceholder="Search subjects..."
+          />
+
+          <HierarchicalCategoryDropdown
+            label="Topic"
+            options={topicFilterOptions}
+            value={topicFilter}
+            onChange={(option) =>
+              updateUrlFilters({
+                topicID:
+                  option.value === ALL_EXAM_TOPIC_VALUE ? "" : option.value,
+              })
+            }
+            placeholder="All topics"
+            searchPlaceholder="Search topics..."
           />
 
           <button
@@ -697,13 +888,7 @@ export function ExamManager({
             <RotateCcw size={15} />
             Reset
           </button>
-          <Link
-            href="/exams/create"
-            className="button button-primary min-h-11 md:self-end"
-          >
-            <Plus size={16} />
-            Create exam
-          </Link>
+          <CreateExamMenu />
         </div>
       </section>
 
@@ -711,7 +896,7 @@ export function ExamManager({
         <div className="flex flex-col gap-1 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-base font-semibold text-foreground">
-              Exam list
+              {pageConfig.listLabel}
             </h2>
             <p className="text-sm text-muted">
               {filteredExams.length} of {exams.length} exams shown
@@ -868,7 +1053,7 @@ export function ExamManager({
                       No exams found
                     </p>
                     <p className="mt-1 text-sm text-muted">
-                      Adjust the filters or create a new exam.
+                      {pageConfig.emptyMessage}
                     </p>
                   </TableTd>
                 </TableRow>

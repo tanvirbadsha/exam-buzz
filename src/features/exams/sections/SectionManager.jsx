@@ -3,7 +3,6 @@
 import CustomSearch from "@/components/ui/CustomSearch";
 import { FloatingActionMenu } from "@/components/ui/FloatingActionMenu";
 import { Pagination } from "@/components/ui/Pagination";
-import { StatusToggle } from "@/components/ui/StatusToggle";
 import {
   Table,
   TableBody,
@@ -13,14 +12,19 @@ import {
   TableTd,
   TableTh,
 } from "@/components/ui/CustomTable";
-import { CustomDropdown } from "@/components/ui/forms/CustomDropdown";
-import { useExamManagement } from "@/hooks/useExamManagement";
-import { useSectionManagement } from "@/hooks/useSectionManagement";
+import { HierarchicalCategoryDropdown } from "@/features/categories/HierarchicalCategoryDropdown";
+import { useGetAllExamsQuery } from "@/features/exams/exam/api/examApi";
+import {
+  useCreateSectionMutation,
+  useDeleteSectionMutation,
+  useGetAllSectionsQuery,
+  useUpdateSectionMutation,
+} from "@/features/exams/sections/api/sectionApi";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
   ALL_SECTIONS_EXAM_VALUE,
   formatSectionDate,
   getSectionExamId,
-  getSectionStatus,
 } from "@/lib/sectionData";
 import {
   BookOpenCheck,
@@ -33,11 +37,12 @@ import {
   Trash2,
 } from "lucide-react";
 import Link from "next/link";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { SectionModal } from "./SectionModal";
 
 const ITEMS_PER_PAGE = 6;
+const EXAM_OPTIONS_LIMIT = 1000;
 
 function getExamName(exam) {
   return exam?.name || "Unknown exam";
@@ -67,10 +72,60 @@ function buildExamOptions(exams, sections) {
     .map((exam) => ({
       label: getExamName(exam),
       value: exam.id,
-      meta: `ID: ${exam.id}`,
-      searchText: `${getExamName(exam)} ${exam.id}`,
+      depth: 0,
+      meta: getExamName(exam),
+      searchText: `${getExamName(exam)} ${exam.id} ${exam.category?.name || ""}`,
       exam,
     }));
+}
+
+function getApiErrorMessage(error, fallbackMessage) {
+  return (
+    error?.data?.message ||
+    error?.error ||
+    error?.message ||
+    fallbackMessage
+  );
+}
+
+function getExamsFromResponse(response) {
+  return Array.isArray(response?.exams) ? response.exams : [];
+}
+
+function getSectionsFromResponse(response) {
+  return Array.isArray(response?.sections) ? response.sections : [];
+}
+
+function normalizeApiId(value) {
+  const numericValue = Number(value);
+  return Number.isNaN(numericValue) ? value : numericValue;
+}
+
+function buildSectionPayload(sectionInput) {
+  return {
+    examID: normalizeApiId(sectionInput.examID),
+    name: sectionInput.name.trim(),
+    maxPapers: Number(sectionInput.maxPapers),
+  };
+}
+
+function buildSectionUpdateBody(section, sectionInput) {
+  const nextPayload = buildSectionPayload(sectionInput);
+  const body = {};
+
+  if (String(getSectionExamId(section)) !== String(nextPayload.examID)) {
+    body.examID = nextPayload.examID;
+  }
+
+  if ((section.name || "").trim() !== nextPayload.name) {
+    body.name = nextPayload.name;
+  }
+
+  if (Number(section.maxPapers) !== nextPayload.maxPapers) {
+    body.maxPapers = nextPayload.maxPapers;
+  }
+
+  return body;
 }
 
 function SectionActionMenu({ onDelete, onEdit, section }) {
@@ -120,9 +175,7 @@ function SectionActionMenu({ onDelete, onEdit, section }) {
   );
 }
 
-function SectionMobileCard({ onDelete, onEdit, onStatusChange, section }) {
-  const isActive = getSectionStatus(section);
-
+function SectionMobileCard({ onDelete, onEdit, section }) {
   return (
     <article className="rounded-lg border border-border bg-surface p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
@@ -154,30 +207,13 @@ function SectionMobileCard({ onDelete, onEdit, onStatusChange, section }) {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-muted">
-              Max papers
-            </p>
-            <p className="mt-1 font-semibold text-foreground">
-              {section.maxPapers}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-muted">
-              Status
-            </p>
-            <div className="mt-1 flex items-center gap-2">
-              <StatusToggle
-                checked={isActive}
-                label={`Set ${section.name} active status`}
-                onChange={(checked) => onStatusChange(section, checked)}
-              />
-              <span className="text-xs font-semibold text-muted">
-                {isActive ? "Active" : "Inactive"}
-              </span>
-            </div>
-          </div>
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-muted">
+            Max papers
+          </p>
+          <p className="mt-1 font-semibold text-foreground">
+            {section.maxPapers}
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -203,16 +239,7 @@ function SectionMobileCard({ onDelete, onEdit, onStatusChange, section }) {
   );
 }
 
-export function SectionManager({ initialExams, initialSections }) {
-  const { exams } = useExamManagement(initialExams);
-  const {
-    createSection,
-    deleteSection,
-    sections,
-    totals,
-    updateSection,
-    updateSectionStatus,
-  } = useSectionManagement(initialSections, exams);
+export function SectionManager() {
   const [searchQuery, setSearchQuery] = useState("");
   const [examFilter, setExamFilter] = useState(ALL_SECTIONS_EXAM_VALUE);
   const [currentPage, setCurrentPage] = useState(1);
@@ -221,7 +248,32 @@ export function SectionManager({ initialExams, initialSections }) {
     mode: "create",
     section: null,
   });
-  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 350);
+  const {
+    data: sectionsData,
+    error: sectionsError,
+    isFetching: isFetchingSections,
+    isLoading: isLoadingSections,
+    refetch,
+  } = useGetAllSectionsQuery();
+  const { data: examsData, isFetching: isFetchingExams } = useGetAllExamsQuery({
+    page: 1,
+    limit: EXAM_OPTIONS_LIMIT,
+  });
+  const [createSection, { isLoading: isCreating }] =
+    useCreateSectionMutation();
+  const [updateSection, { isLoading: isUpdating }] =
+    useUpdateSectionMutation();
+  const [deleteSection, { isLoading: isDeleting }] =
+    useDeleteSectionMutation();
+
+  const sections = useMemo(
+    () => getSectionsFromResponse(sectionsData),
+    [sectionsData],
+  );
+  const exams = useMemo(() => getExamsFromResponse(examsData), [examsData]);
+  const isSubmitting = isCreating || isUpdating;
+  const isBusy = isSubmitting || isDeleting;
 
   const examsById = useMemo(
     () => new Map(exams.map((exam) => [String(exam.id), exam])),
@@ -236,6 +288,7 @@ export function SectionManager({ initialExams, initialSections }) {
       {
         label: "All exams",
         value: ALL_SECTIONS_EXAM_VALUE,
+        depth: 0,
         meta: "Any exam",
         searchText: "all exams",
       },
@@ -256,13 +309,10 @@ export function SectionManager({ initialExams, initialSections }) {
   );
 
   const filteredSections = useMemo(() => {
-    const query = deferredSearchQuery.trim().toLowerCase();
+    const query = debouncedSearchQuery.trim().toLowerCase();
 
     return enrichedSections.filter((section) => {
       const examId = getSectionExamId(section);
-      const statusText = getSectionStatus(section)
-        ? "active true"
-        : "inactive false";
       const matchesExam =
         examFilter === ALL_SECTIONS_EXAM_VALUE ||
         String(examId) === String(examFilter);
@@ -276,7 +326,6 @@ export function SectionManager({ initialExams, initialSections }) {
           section.maxPapers,
           section.createdAt,
           section.updatedAt,
-          statusText,
         ]
           .join(" ")
           .toLowerCase()
@@ -284,7 +333,19 @@ export function SectionManager({ initialExams, initialSections }) {
 
       return matchesExam && matchesSearch;
     });
-  }, [deferredSearchQuery, enrichedSections, examFilter]);
+  }, [debouncedSearchQuery, enrichedSections, examFilter]);
+
+  const totals = useMemo(
+    () =>
+      sections.reduce(
+        (summary, section) => ({
+          total: summary.total + 1,
+          capacity: summary.capacity + (Number(section.maxPapers) || 0),
+        }),
+        { total: 0, capacity: 0 },
+      ),
+    [sections],
+  );
 
   const totalPages = Math.max(
     1,
@@ -324,58 +385,128 @@ export function SectionManager({ initialExams, initialSections }) {
     setModalState((currentState) => ({ ...currentState, isOpen: false }));
   };
 
-  const attachSelectedExam = (sectionInput) => {
-    const selectedOption = examOptions.find(
-      (option) => String(option.value) === String(sectionInput.examID),
-    );
-
-    return {
-      ...sectionInput,
-      exam: selectedOption?.exam || null,
-    };
-  };
-
-  const handleSectionSubmit = (sectionInput) => {
-    const inputWithExam = attachSelectedExam(sectionInput);
-
+  const handleSectionSubmit = async (sectionInput) => {
     if (modalState.mode === "edit" && modalState.section) {
-      const updatedSection = updateSection(
-        modalState.section.id,
-        inputWithExam,
-      );
-      if (updatedSection) {
-        toast.success(`${updatedSection.name} updated.`);
+      const body = buildSectionUpdateBody(modalState.section, sectionInput);
+
+      if (Object.keys(body).length === 0) {
+        toast.success("No section changes to save.");
+        return true;
       }
-      return;
+
+      try {
+        const response = await updateSection({
+          id: modalState.section.id,
+          body,
+        }).unwrap();
+        toast.success(
+          `${response?.section?.name || body.name || modalState.section.name} updated.`,
+        );
+        return true;
+      } catch (error) {
+        toast.error(
+          getApiErrorMessage(error, "Section could not be updated."),
+        );
+        return false;
+      }
     }
 
-    const createdSection = createSection(inputWithExam);
-    toast.success(`${createdSection.name} created.`);
-    resetFilters();
+    const payload = buildSectionPayload(sectionInput);
+
+    try {
+      const response = await createSection(payload).unwrap();
+      toast.success(`${response?.section?.name || payload.name} created.`);
+      resetFilters();
+      return true;
+    } catch (error) {
+      toast.error(
+        getApiErrorMessage(error, "Section could not be created."),
+      );
+      return false;
+    }
   };
 
-  const handleDelete = (section) => {
+  const handleDelete = async (section) => {
     const confirmed = window.confirm(`Delete ${section.name}?`);
     if (!confirmed) return;
 
-    const deletedSection = deleteSection(section.id);
-    if (deletedSection) {
-      toast.success(`${deletedSection.name} deleted.`);
-      setCurrentPage(1);
-      return;
-    }
-
-    toast.error("Section could not be deleted.");
-  };
-
-  const handleStatusChange = (section, checked) => {
-    const updatedSection = updateSectionStatus(section.id, checked);
-    if (updatedSection) {
-      toast.success(
-        `${updatedSection.name} marked ${checked ? "active" : "inactive"}.`,
+    try {
+      await deleteSection(section.id).unwrap();
+      toast.success(`${section.name} deleted.`);
+      if (paginatedSections.length === 1 && currentPage > 1) {
+        setCurrentPage((page) => Math.max(1, page - 1));
+      }
+    } catch (error) {
+      toast.error(
+        getApiErrorMessage(error, "Section could not be deleted."),
       );
     }
   };
+
+  if (sectionsError && sections.length === 0) {
+    return (
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+        <div>
+          <p className="text-sm font-semibold text-brand-strong">
+            Exam management
+          </p>
+          <h1 className="mt-1 text-2xl font-black text-foreground sm:text-3xl">
+            Sections
+          </h1>
+        </div>
+        <div
+          className="mx-auto w-full max-w-3xl rounded-lg border border-rose-200 bg-rose-50 px-5 py-6 text-rose-950"
+          role="alert"
+        >
+          <h2 className="text-base font-bold">Unable to load sections</h2>
+          <p className="mt-1 text-sm leading-6 text-rose-800">
+            {getApiErrorMessage(
+              sectionsError,
+              "The section list could not be loaded.",
+            )}
+          </p>
+          <button
+            type="button"
+            className="button button-secondary mt-4 bg-white"
+            onClick={refetch}
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoadingSections && sections.length === 0) {
+    return (
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+        <div>
+          <p className="text-sm font-semibold text-brand-strong">
+            Exam management
+          </p>
+          <h1 className="mt-1 text-2xl font-black text-foreground sm:text-3xl">
+            Sections
+          </h1>
+        </div>
+        <div className="surface-card py-12 text-center">
+          <p className="font-semibold text-foreground">Loading sections...</p>
+          <p className="mt-1 text-sm text-muted">
+            Fetching sections and exam options.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const sectionsSummary = isFetchingSections
+    ? "Refreshing sections..."
+    : `${filteredSections.length} of ${sections.length} sections shown`;
+
+  const examDropdownPlaceholder = isFetchingExams
+    ? "Loading exams..."
+    : "All exams";
+
+  const canCreateSection = examOptions.length > 0 && !isFetchingExams;
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
@@ -387,28 +518,18 @@ export function SectionManager({ initialExams, initialSections }) {
           <h1 className="mt-1 text-2xl font-black text-foreground sm:text-3xl">
             Sections
           </h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-            Organize exams into paper sections and control each section paper
-            capacity.
-          </p>
         </div>
 
-        <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
-          <div className="border-r border-border px-4 py-3">
+        <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
+          <div className="border-r border-border px-6 py-5">
             <p className="text-xs font-semibold text-muted">Total</p>
-            <p className="mt-1 text-xl font-black text-foreground">
+            <p className="mt-2 text-3xl font-black text-foreground">
               {totals.total}
             </p>
           </div>
-          <div className="border-r border-border px-4 py-3">
-            <p className="text-xs font-semibold text-muted">Active</p>
-            <p className="mt-1 text-xl font-black text-foreground">
-              {totals.active}
-            </p>
-          </div>
-          <div className="px-4 py-3">
+          <div className="px-6 py-5">
             <p className="text-xs font-semibold text-muted">Visible</p>
-            <p className="mt-1 text-xl font-black text-foreground">
+            <p className="mt-2 text-3xl font-black text-foreground">
               {filteredSections.length}
             </p>
           </div>
@@ -423,25 +544,25 @@ export function SectionManager({ initialExams, initialSections }) {
                 Section list
               </h2>
               <p className="text-sm text-muted">
-                {filteredSections.length} of {sections.length} sections shown
+                {sectionsSummary}
               </p>
             </div>
 
             <div className="grid w-full gap-3 sm:grid-cols-2 sm:items-end xl:grid-cols-[minmax(16rem,1fr)_minmax(14rem,16rem)_auto_auto] lg:min-w-0 lg:flex-1">
               <CustomSearch
-                placeholder="Search by section, exam, ID, or status..."
+                placeholder="Search by section, exam, or ID..."
                 searchQuery={searchQuery}
                 setSearchQuery={handleSearchChange}
                 ariaLabel="Search sections"
                 wide
               />
-              <CustomDropdown
+              <HierarchicalCategoryDropdown
                 label="Exam"
                 icon={BookOpenCheck}
                 options={examFilterOptions}
                 value={examFilter}
                 onChange={handleExamFilterChange}
-                placeholder="All exams"
+                placeholder={examDropdownPlaceholder}
                 searchPlaceholder="Search exams..."
               />
               <button
@@ -456,6 +577,7 @@ export function SectionManager({ initialExams, initialSections }) {
                 type="button"
                 className="button button-primary min-h-10 sm:self-end"
                 onClick={openCreateModal}
+                disabled={!canCreateSection || isBusy}
               >
                 <Plus size={16} />
                 Create section
@@ -472,7 +594,6 @@ export function SectionManager({ initialExams, initialSections }) {
                 section={section}
                 onDelete={handleDelete}
                 onEdit={openEditModal}
-                onStatusChange={handleStatusChange}
               />
             ))
           ) : (
@@ -494,12 +615,11 @@ export function SectionManager({ initialExams, initialSections }) {
           <Table className="table-fixed text-xs">
             <colgroup>
               <col className="w-[7%]" />
-              <col className="w-[18%]" />
-              <col className="w-[25%]" />
+              <col className="w-[20%]" />
+              <col className="w-[27%]" />
               <col className="w-[9%]" />
-              <col className="w-[13%]" />
-              <col className="w-[13%]" />
-              <col className="w-[7%]" />
+              <col className="w-[14%]" />
+              <col className="w-[15%]" />
               <col className="w-[8%]" />
             </colgroup>
             <TableHead>
@@ -510,7 +630,6 @@ export function SectionManager({ initialExams, initialSections }) {
                 <TableTh className="px-2">Max papers</TableTh>
                 <TableTh className="px-2">Created</TableTh>
                 <TableTh className="px-2">Updated</TableTh>
-                <TableTh className="px-2">Status</TableTh>
                 <TableTh className="px-2 text-right">Actions</TableTh>
               </tr>
             </TableHead>
@@ -556,15 +675,6 @@ export function SectionManager({ initialExams, initialSections }) {
                       {formatSectionDate(section.updatedAt)}
                     </TableTd>
                     <TableTd className="px-2 align-top">
-                      <StatusToggle
-                        checked={getSectionStatus(section)}
-                        label={`Set ${section.name} active status`}
-                        onChange={(checked) =>
-                          handleStatusChange(section, checked)
-                        }
-                      />
-                    </TableTd>
-                    <TableTd className="px-2 align-top">
                       <SectionActionMenu
                         section={section}
                         onDelete={handleDelete}
@@ -603,6 +713,7 @@ export function SectionManager({ initialExams, initialSections }) {
       <SectionModal
         examOptions={examOptions}
         isOpen={modalState.isOpen}
+        isSubmitting={isSubmitting}
         mode={modalState.mode}
         onClose={closeModal}
         onSubmit={handleSectionSubmit}

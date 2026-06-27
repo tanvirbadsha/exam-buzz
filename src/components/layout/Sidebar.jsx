@@ -36,7 +36,9 @@ const menuItems = [
     icon: BookOpenCheck,
     isDropdown: true,
     children: [
-      { label: "Exams", href: "/exams" },
+      { label: "All Exams", href: "/exams", exact: true },
+      { label: "Upcoming Exams", href: "/exams/upcoming-exams" },
+      { label: "Live Exams", href: "/exams/live-exams" },
       { label: "Sections", href: "/sections" },
       { label: "Exam Types", href: "/exam-types" },
       // { label: "Question Bank", href: "/exams/questions" },
@@ -160,9 +162,14 @@ function SidebarContent({ onClose }) {
           const Icon = item.icon;
 
           if (item.isDropdown) {
-            const isChildActive = item.children?.some(
-              (child) => pathname === child.href,
-            );
+            const isChildActive =
+              item.children?.some((child) =>
+                child.exact
+                  ? pathname === child.href
+                  : pathname === child.href ||
+                    pathname.startsWith(`${child.href}/`),
+              ) ||
+              (item.label === "Exams" && pathname.startsWith("/exams/"));
             const isOpen = openDropdowns[item.label] ?? Boolean(isChildActive);
 
             return (
@@ -194,9 +201,10 @@ function SidebarContent({ onClose }) {
                 {isOpen && (
                   <div className="pl-9 space-y-1 mt-1 border-l border-white/10 ml-6">
                     {item.children?.map((child) => {
-                      const isSubActive =
-                        pathname === child.href ||
-                        pathname.startsWith(`${child.href}/`);
+                      const isSubActive = child.exact
+                        ? pathname === child.href
+                        : pathname === child.href ||
+                          pathname.startsWith(`${child.href}/`);
                       return (
                         <Link
                           key={child.href}

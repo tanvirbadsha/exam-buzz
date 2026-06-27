@@ -1,20 +1,15 @@
 "use client";
 
-import { StatusToggle } from "@/components/ui/StatusToggle";
-import { SectionNotFound } from "@/features/sections/SectionNotFound";
-import { useExamManagement } from "@/hooks/useExamManagement";
-import { useSectionManagement } from "@/hooks/useSectionManagement";
-import { DEFAULT_EXAMS } from "@/lib/examData";
+import { useGetExamByIdQuery } from "@/features/exams/exam/api/examApi";
+import { useGetSectionByIdQuery } from "@/features/exams/sections/api/sectionApi";
+import { SectionNotFound } from "@/features/exams/sections/SectionNotFound";
 import {
-  DEFAULT_SECTIONS_RESPONSE,
   formatSectionDate,
   getSectionExamId,
-  getSectionStatus,
 } from "@/lib/sectionData";
-import { ArrowLeft, BookOpenCheck, Layers3 } from "lucide-react";
+import { ArrowLeft, Layers3 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import toast from "react-hot-toast";
 
 function DetailRow({ label, value }) {
   return (
@@ -31,12 +26,22 @@ function DetailRow({ label, value }) {
 
 export default function ViewSectionPage() {
   const { sectionId } = useParams();
-  const { exams, getExamById } = useExamManagement(DEFAULT_EXAMS);
-  const { getSectionById, isLoaded, updateSectionStatus } =
-    useSectionManagement(DEFAULT_SECTIONS_RESPONSE.sections, exams);
-  const section = getSectionById(sectionId);
+  const {
+    data,
+    error,
+    isFetching,
+    isLoading,
+    refetch,
+  } = useGetSectionByIdQuery(sectionId, {
+    skip: !sectionId,
+  });
+  const section = data?.section || data || null;
+  const examID = getSectionExamId(section);
+  const { data: examData } = useGetExamByIdQuery(examID, {
+    skip: !examID || Boolean(section?.exam),
+  });
 
-  if (!isLoaded) {
+  if (isLoading || isFetching) {
     return (
       <div className="mx-auto w-full max-w-5xl">
         <div className="surface-card h-56 animate-pulse" />
@@ -44,29 +49,35 @@ export default function ViewSectionPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+        <Link href="/sections" className="back-link">
+          <ArrowLeft size={14} />
+          Back to sections
+        </Link>
+        <section className="surface-card p-8 text-center">
+          <h1 className="text-xl font-bold text-foreground">
+            Unable to load section
+          </h1>
+          <p className="mt-2 text-sm text-muted">
+            The section details could not be loaded.
+          </p>
+          <button
+            type="button"
+            className="button button-secondary mt-5"
+            onClick={refetch}
+          >
+            Retry
+          </button>
+        </section>
+      </div>
+    );
+  }
+
   if (!section) return <SectionNotFound />;
 
-  const examID = getSectionExamId(section);
-  const exam = section.exam || getExamById(examID);
-  const isActive = getSectionStatus(section);
-  const responsePreview = {
-    status: 200,
-    message: "Section retrieved successfully",
-    section: {
-      ...section,
-      status: isActive,
-      exam,
-    },
-  };
-
-  const handleStatusChange = (checked) => {
-    const updatedSection = updateSectionStatus(section.id, checked);
-    if (updatedSection) {
-      toast.success(
-        `${updatedSection.name} marked ${checked ? "active" : "inactive"}.`,
-      );
-    }
-  };
+  const exam = section.exam || examData?.exam || examData;
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
@@ -99,34 +110,23 @@ export default function ViewSectionPage() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <StatusToggle
-                checked={isActive}
-                label={`Set ${section.name} active status`}
-                onChange={handleStatusChange}
-              />
-              <span
-                className={`w-fit rounded-full border px-3 py-1 text-xs font-bold ${
-                  isActive
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : "border-slate-200 bg-slate-100 text-slate-600"
-                }`}
-              >
-                {isActive ? "Active" : "Inactive"}
-              </span>
-            </div>
           </div>
         </div>
 
-        <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_24rem]">
+        <div className="p-5">
           <dl>
             <DetailRow label="Name" value={section.name} />
             <DetailRow label="Exam" value={exam?.name || "Unknown exam"} />
             <DetailRow label="Exam ID" value={examID} />
             <DetailRow label="Max papers" value={section.maxPapers} />
-            <DetailRow label="Status" value={isActive ? "Active" : "Inactive"} />
-            <DetailRow label="Created" value={formatSectionDate(section.createdAt)} />
-            <DetailRow label="Updated" value={formatSectionDate(section.updatedAt)} />
+            <DetailRow
+              label="Created"
+              value={formatSectionDate(section.createdAt)}
+            />
+            <DetailRow
+              label="Updated"
+              value={formatSectionDate(section.updatedAt)}
+            />
             <DetailRow
               label="Duration"
               value={
@@ -157,18 +157,6 @@ export default function ViewSectionPage() {
               }
             />
           </dl>
-
-          <aside className="rounded-lg border border-border bg-surface-muted p-4">
-            <div className="flex items-center gap-2">
-              <BookOpenCheck size={16} className="text-brand-strong" />
-              <h3 className="text-sm font-bold text-foreground">
-                Response preview
-              </h3>
-            </div>
-            <pre className="mt-3 max-h-96 overflow-auto rounded-lg border border-border bg-surface p-3 text-xs leading-5 text-foreground">
-              {JSON.stringify(responsePreview, null, 2)}
-            </pre>
-          </aside>
         </div>
       </section>
     </div>

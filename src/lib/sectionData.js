@@ -43,7 +43,10 @@ export function getSectionExamId(section) {
 }
 
 export function getSectionStatus(section) {
-  return typeof section?.status === "boolean" ? section.status : true;
+  if (typeof section?.status === "boolean") return section.status;
+  if (typeof section?.exam?.status === "boolean") return section.exam.status;
+
+  return true;
 }
 
 export function formatSectionDate(value) {

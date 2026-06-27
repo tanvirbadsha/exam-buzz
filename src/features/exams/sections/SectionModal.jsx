@@ -1,7 +1,7 @@
 "use client";
 
-import { CustomDropdown } from "@/components/ui/forms/CustomDropdown";
 import { TextInput } from "@/components/ui/forms/TextInput";
+import { HierarchicalCategoryDropdown } from "@/features/categories/HierarchicalCategoryDropdown";
 import { BookOpenCheck, FileText, Hash, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -42,6 +42,7 @@ function buildErrors(form, examIds) {
 
 function SectionModalForm({
   examOptions,
+  isSubmitting,
   mode,
   onClose,
   onSubmit,
@@ -65,7 +66,7 @@ function SectionModalForm({
     });
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
     const nextErrors = buildErrors(form, examIds);
@@ -73,18 +74,21 @@ function SectionModalForm({
 
     if (Object.keys(nextErrors).length > 0) return;
 
-    onSubmit({
+    const shouldClose = await onSubmit({
       examID: form.examID,
       name: form.name.trim(),
       maxPapers: Number(form.maxPapers),
     });
-    onClose();
+
+    if (shouldClose !== false) {
+      onClose();
+    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="px-5 py-5 sm:px-6 sm:py-6">
       <div className="grid gap-4">
-        <CustomDropdown
+        <HierarchicalCategoryDropdown
           label="Exam"
           icon={BookOpenCheck}
           options={examOptions}
@@ -125,11 +129,22 @@ function SectionModalForm({
           type="button"
           className="button button-secondary"
           onClick={onClose}
+          disabled={isSubmitting}
         >
           Cancel
         </button>
-        <button type="submit" className="button button-primary">
-          {isEditMode ? "Save changes" : "Create section"}
+        <button
+          type="submit"
+          className="button button-primary"
+          disabled={isSubmitting}
+        >
+          {isSubmitting
+            ? isEditMode
+              ? "Saving..."
+              : "Creating..."
+            : isEditMode
+              ? "Save changes"
+              : "Create section"}
         </button>
       </div>
     </form>
@@ -139,6 +154,7 @@ function SectionModalForm({
 export function SectionModal({
   examOptions,
   isOpen,
+  isSubmitting = false,
   mode,
   onClose,
   onSubmit,
@@ -202,6 +218,7 @@ export function SectionModal({
         <SectionModalForm
           key={formKey}
           examOptions={examOptions}
+          isSubmitting={isSubmitting}
           mode={mode}
           onClose={onClose}
           onSubmit={onSubmit}

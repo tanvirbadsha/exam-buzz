@@ -25,15 +25,11 @@ async function safeSsrFetch(endpoint, key, fallbackMessage, limit) {
   try {
     return await ssrFetch(endpoint);
   } catch (error) {
-    return emptyListResponse(
-      key,
-      error?.message || fallbackMessage,
-      limit,
-    );
+    return emptyListResponse(key, error?.message || fallbackMessage, limit);
   }
 }
 
-async function getExamPageData() {
+async function getUpcomingExamPageData() {
   const examParams = new URLSearchParams({
     page: String(FIRST_PAGE),
     limit: String(EXAM_LIST_LIMIT),
@@ -46,9 +42,9 @@ async function getExamPageData() {
   const [examsData, categoriesData, subjectsData, topicsData] =
     await Promise.all([
       safeSsrFetch(
-        `/exam/exams/get-all-exams?${examParams}`,
+        `/exam/exams/get-upcoming-exams?${examParams}`,
         "exams",
-        "Unable to load exams.",
+        "Unable to load upcoming exams.",
         EXAM_LIST_LIMIT,
       ),
       safeSsrFetch(
@@ -79,14 +75,14 @@ async function getExamPageData() {
   };
 }
 
-export default async function ExamsPage() {
+export default async function UpcomingExamsPage() {
   const { categoriesData, examsData, subjectsData, topicsData } =
-    await getExamPageData();
+    await getUpcomingExamPageData();
 
   return (
     <Suspense fallback={null}>
       <ExamManager
-        examListType="all"
+        examListType="upcoming"
         initialCategoriesData={categoriesData}
         initialExamsData={examsData}
         initialSubjectsData={subjectsData}
