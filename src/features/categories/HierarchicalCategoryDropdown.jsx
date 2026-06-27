@@ -113,6 +113,9 @@ function flattenVisibleNodes(nodes, expandedValues, visibleNodes = []) {
 }
 
 export function HierarchicalCategoryDropdown({
+  emptyText = "No categories found.",
+  error,
+  icon: Icon = FolderTree,
   label,
   options = [],
   value,
@@ -149,6 +152,10 @@ export function HierarchicalCategoryDropdown({
   const hasSelectedParent =
     selectedOption && selectedOption.value !== ROOT_PARENT_VALUE;
   const selectedLabel = hasSelectedParent ? getCompactPath(selectedOption) : "";
+  const fallbackId = placeholder.replace(/\s+/g, "-").toLowerCase();
+  const errorId = error
+    ? `${(label || fallbackId).replace(/\s+/g, "-").toLowerCase()}-error`
+    : undefined;
 
   const visibleOptions = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -341,11 +348,17 @@ export function HierarchicalCategoryDropdown({
         type="button"
         aria-haspopup="listbox"
         aria-expanded={isOpen}
+        aria-describedby={errorId}
         onClick={() => (isOpen ? closeDropdown() : openDropdown())}
         onKeyDown={handleTriggerKeyDown}
-        className="field-shell w-full px-3 text-left"
+        className={`field-shell w-full px-3 text-left ${
+          error ? "field-shell-error" : ""
+        }`}
       >
-        <FolderTree size={16} className="mr-2.5 shrink-0 text-muted" />
+        <Icon
+          size={16}
+          className={`${error ? "text-rose-400" : "text-muted"} mr-2.5 shrink-0`}
+        />
         <span
           className={`field-input flex-1 truncate ${
             hasSelectedParent ? "" : "text-[#94a39a]"
@@ -403,7 +416,7 @@ export function HierarchicalCategoryDropdown({
 
                   return (
                     <div
-                      key={option.value}
+                      key={`${option.value}-${index}`}
                       role="option"
                       aria-selected={isSelected}
                       onMouseEnter={() => {
@@ -455,14 +468,17 @@ export function HierarchicalCategoryDropdown({
                   );
                 })
               ) : (
-                <div className="px-3 py-2 text-sm text-muted">
-                  No categories found.
-                </div>
+                <div className="px-3 py-2 text-sm text-muted">{emptyText}</div>
               )}
             </div>
           </div>,
           document.body,
         )}
+      {error && (
+        <span id={errorId} className="field-error" role="alert">
+          {error.message}
+        </span>
+      )}
     </div>
   );
 }

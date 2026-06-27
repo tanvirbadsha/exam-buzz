@@ -15,6 +15,8 @@ export function FloatingActionMenu({
   ariaLabel,
   children,
   menuHeight = 176,
+  triggerClassName = "icon-button h-9 w-9 border border-border",
+  triggerContent,
   triggerIcon = <MoreVertical size={18} />,
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -76,13 +78,13 @@ export function FloatingActionMenu({
       <button
         ref={triggerRef}
         type="button"
-        className="icon-button h-9 w-9 border border-border"
+        className={triggerClassName}
         aria-label={ariaLabel}
         aria-haspopup="menu"
         aria-expanded={isOpen}
         onClick={() => (isOpen ? setIsOpen(false) : openMenu())}
       >
-        {triggerIcon}
+        {triggerContent || triggerIcon}
       </button>
 
       {isOpen &&
