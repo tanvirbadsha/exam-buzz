@@ -1,21 +1,6 @@
 "use client";
 
 import {
-  ChevronDown,
-  Download,
-  Eye,
-  FilePenLine,
-  Pencil,
-  Plus,
-  RotateCcw,
-  Search,
-  Trash2,
-} from "lucide-react";
-import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import toast from "react-hot-toast";
-import {
   Table,
   TableBody,
   TableContainer,
@@ -57,6 +42,21 @@ import {
   getExamCategoryId,
   getExamPdfLabel,
 } from "@/lib/examData";
+import {
+  ChevronDown,
+  Download,
+  Eye,
+  FilePenLine,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Search,
+  Trash2,
+} from "lucide-react";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import toast from "react-hot-toast";
 import { useDispatch } from "react-redux";
 
 const EXAM_LIST_LIMIT = 1000;
@@ -99,6 +99,7 @@ const EXAM_PAGE_CONFIG = {
   },
 };
 
+// sort alphabetically
 function sortByName(items) {
   return [...items].sort((firstItem, secondItem) =>
     firstItem.name.localeCompare(secondItem.name),
@@ -226,7 +227,9 @@ function getNamesByIds(ids, itemsById, fallbackPrefix) {
 
 function PdfLink({ href, label }) {
   if (!href) {
-    return <span className="text-xs font-semibold text-muted">Not uploaded</span>;
+    return (
+      <span className="text-xs font-semibold text-muted">Not uploaded</span>
+    );
   }
 
   return (
@@ -351,9 +354,9 @@ export function ExamManager({
       !initialTopicsData ||
       Boolean(
         initialExamsData?._error ||
-          initialCategoriesData?._error ||
-          initialSubjectsData?._error ||
-          initialTopicsData?._error,
+        initialCategoriesData?._error ||
+        initialSubjectsData?._error ||
+        initialTopicsData?._error,
       ),
   );
 
@@ -421,9 +424,9 @@ export function ExamManager({
     !hasHydratedInitialData &&
     Boolean(
       initialExamsData &&
-        initialCategoriesData &&
-        initialSubjectsData &&
-        initialTopicsData,
+      initialCategoriesData &&
+      initialSubjectsData &&
+      initialTopicsData,
     );
   const examQueryArgs = useMemo(() => {
     const args = {
@@ -464,10 +467,7 @@ export function ExamManager({
     refetch: refetchExams,
   } = useExamListQuery(examQueryArgs, {
     skip: canUseInitialExamsData,
-    placeholderData:
-      canUseInitialExamsData
-        ? initialExamsData
-        : undefined,
+    placeholderData: canUseInitialExamsData ? initialExamsData : undefined,
   });
   const {
     data: queryCategoriesData,
@@ -511,10 +511,7 @@ export function ExamManager({
   const [deleteExam] = useDeleteExamMutation();
   const [updateExamStatus] = useUpdateExamStatusMutation();
 
-  const examsData =
-    canUseInitialExamsData
-      ? initialExamsData
-      : queryExamsData;
+  const examsData = canUseInitialExamsData ? initialExamsData : queryExamsData;
   const categoriesData =
     shouldUseInitialData && !initialCategoriesData?._error
       ? initialCategoriesData
@@ -541,7 +538,9 @@ export function ExamManager({
   );
   const subjects = useMemo(
     () =>
-      normalizeExamSubjects(getLookupItemsFromResponse(subjectsData, "subjects")),
+      normalizeExamSubjects(
+        getLookupItemsFromResponse(subjectsData, "subjects"),
+      ),
     [subjectsData],
   );
   const topics = useMemo(
@@ -642,8 +641,7 @@ export function ExamManager({
           .join(" ")
           .toLowerCase()
           .includes(query);
-      const matchesCategory =
-        !categoryIds || categoryIds.has(examCategoryId);
+      const matchesCategory = !categoryIds || categoryIds.has(examCategoryId);
       const matchesSubject =
         !subjectIds ||
         examSubjectIds.some((subjectId) => subjectIds.has(subjectId));
@@ -717,7 +715,10 @@ export function ExamManager({
       toast.success(`${exam.name} marked ${checked ? "active" : "inactive"}.`);
     } catch (statusError) {
       toast.error(
-        getExamApiErrorMessage(statusError, "Exam status could not be updated."),
+        getExamApiErrorMessage(
+          statusError,
+          "Exam status could not be updated.",
+        ),
       );
     } finally {
       setPendingStatusIds((currentIds) => {
@@ -733,7 +734,9 @@ export function ExamManager({
     (!queryCategoriesData &&
       initialCategoriesData?._error &&
       initialCategoriesData) ||
-    (!querySubjectsData && initialSubjectsData?._error && initialSubjectsData) ||
+    (!querySubjectsData &&
+      initialSubjectsData?._error &&
+      initialSubjectsData) ||
     (!queryTopicsData && initialTopicsData?._error && initialTopicsData) ||
     null;
   const activeError =
@@ -784,7 +787,7 @@ export function ExamManager({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-8xl flex-col gap-6">
       <section className="grid gap-5 xl:grid-cols-2 xl:items-end">
         <div>
           <p className="text-sm font-semibold text-brand-strong">
@@ -819,8 +822,8 @@ export function ExamManager({
         </div>
       </section>
 
-      <section className="surface-card p-4">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1fr)_minmax(12rem,15rem)_minmax(12rem,15rem)_minmax(12rem,15rem)_auto_auto] xl:items-end">
+      <section className="surface-card p-4 px-1 w-full max-w-full overflow-hidden">
+        <div className="grid gap-1 md:grid-cols-2 xl:grid-cols-[minmax(12rem,1.5fr)_minmax(10rem,1fr)_minmax(10rem,1fr)_minmax(12rem,15rem)_auto_auto] xl:items-end">
           <label className="field-group min-w-0">
             <span className="field-label">Search exams</span>
             <span className="field-shell px-3">
@@ -903,7 +906,11 @@ export function ExamManager({
             </p>
           </div>
           {isRefreshing && (
-            <GlobalSpinner label="Refreshing..." compact className="sm:justify-end" />
+            <GlobalSpinner
+              label="Refreshing..."
+              compact
+              className="sm:justify-end"
+            />
           )}
         </div>
 
@@ -922,11 +929,29 @@ export function ExamManager({
             <TableHead>
               <tr>
                 <TableTh className="px-3">Name</TableTh>
-                <TableTh className="px-3">Subjects<br />Name</TableTh>
-                <TableTh className="px-3">Topic &<br />Source Name</TableTh>
-                <TableTh className="px-3">Exam<br />Timeline</TableTh>
-                <TableTh className="px-3">Duration<br />(min)</TableTh>
-                <TableTh className="px-3">Question &<br />Answer</TableTh>
+                <TableTh className="px-3">
+                  Subjects
+                  <br />
+                  Name
+                </TableTh>
+                <TableTh className="px-3">
+                  Topic &<br />
+                  Source Name
+                </TableTh>
+                <TableTh className="px-3">
+                  Exam
+                  <br />
+                  Timeline
+                </TableTh>
+                <TableTh className="px-3">
+                  Duration
+                  <br />
+                  (min)
+                </TableTh>
+                <TableTh className="px-3">
+                  Question &<br />
+                  Answer
+                </TableTh>
                 <TableTh className="px-3">Status</TableTh>
                 <TableTh className="px-2 text-right">Action</TableTh>
               </tr>
