@@ -61,7 +61,12 @@ const menuItems = [
   {
     label: "Materials",
     icon: FileText,
-    href: "/materials",
+    isDropdown: true,
+    children: [
+      { label: "Folders", href: "/materials/folders" },
+      { label: "Recorded Class", href: "/materials/recorded-class" },
+      { label: "Resources", href: "/materials/resources" },
+    ],
   },
   {
     label: "Courses",
