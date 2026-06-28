@@ -36,7 +36,8 @@ const menuItems = [
     icon: BookOpenCheck,
     isDropdown: true,
     children: [
-      { label: "All Exams", href: "/exams", exact: true },
+      { label: "Written Exams", href: "/exams/written-exams", exact: true },
+      { label: "MCQ Exams", href: "/exams/mcq-exams", exact: true },
       { label: "Upcoming Exams", href: "/exams/upcoming-exams" },
       { label: "Live Exams", href: "/exams/live-exams" },
       { label: "Sections", href: "/sections" },
