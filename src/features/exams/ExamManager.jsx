@@ -15,6 +15,7 @@ import { GlobalSpinner } from "@/components/ui/GlobalSpinner";
 import { StatusToggle } from "@/components/ui/StatusToggle";
 import { HierarchicalCategoryDropdown } from "@/features/categories/HierarchicalCategoryDropdown";
 import { categoryApi } from "@/features/categories/api/categoryApi";
+import { CreateExamBtn } from "@/features/exams/CreateExamBtn";
 import {
   examApi,
   useDeleteExamMutation,
@@ -42,17 +43,7 @@ import {
   getExamCategoryId,
   getExamPdfLabel,
 } from "@/lib/examData";
-import {
-  ChevronDown,
-  Download,
-  Eye,
-  FilePenLine,
-  Pencil,
-  Plus,
-  RotateCcw,
-  Search,
-  Trash2,
-} from "lucide-react";
+import { Download, Eye, Pencil, RotateCcw, Search, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
@@ -280,46 +271,6 @@ function ExamActionMenu({ exam, onDelete }) {
             <Trash2 size={15} />
             Delete
           </button>
-        </>
-      )}
-    </FloatingActionMenu>
-  );
-}
-
-function CreateExamMenu() {
-  return (
-    <FloatingActionMenu
-      ariaLabel="Choose exam type"
-      menuHeight={96}
-      triggerClassName="button button-primary min-h-11 md:self-end"
-      triggerContent={
-        <>
-          <Plus size={16} />
-          Create exam
-          <ChevronDown size={15} />
-        </>
-      }
-    >
-      {({ closeMenu }) => (
-        <>
-          <Link
-            href="/exams/create-written-exam"
-            role="menuitem"
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted"
-            onClick={closeMenu}
-          >
-            <FilePenLine size={15} className="text-muted" />
-            Written exam
-          </Link>
-          <Link
-            href="/exams/create-mcq-exam"
-            role="menuitem"
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted"
-            onClick={closeMenu}
-          >
-            <Pencil size={15} className="text-muted" />
-            MCQ Exam
-          </Link>
         </>
       )}
     </FloatingActionMenu>
@@ -788,7 +739,78 @@ export function ExamManager({
 
   return (
     <div className="mx-auto flex w-full max-w-8xl flex-col gap-6">
-      <section className="grid gap-5 xl:grid-cols-2 xl:items-end">
+      <section className="flex gap-6 justify-between">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 w-full">
+          {/* Live Exams Card */}
+          <div className="rounded-lg border border-border bg-surface p-5 shadow-sm border-l-4 border-l-emerald-500">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-muted">Live Exams</p>
+              <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2 border-t border-border/50 pt-3">
+              <div>
+                <p className="text-xs text-muted">Total Exams</p>
+                <p className="text-xl font-black text-foreground">
+                  {totals.liveExams || 0}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                  Total Attendees
+                </p>
+                <p className="text-xl font-black text-foreground">
+                  {totals.liveAttendees || 0}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Upcoming Exams Card */}
+          <div className="rounded-lg border border-border bg-surface p-5 shadow-sm border-l-4 border-l-blue-500">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-muted">Upcoming Exams</p>
+              <span className="flex h-2 w-2 rounded-full bg-blue-500" />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2 border-t border-border/50 pt-3">
+              <div>
+                <p className="text-xs text-muted">Total Exams</p>
+                <p className="text-xl font-black text-foreground">
+                  {totals.upcomingExams || 0}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-blue-600 dark:text-blue-400 text-nowrap">
+                  Registered Students
+                </p>
+                <p className="text-xl font-black text-foreground">
+                  {totals.upcomingRegistrations || 0}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Archived Exams Card */}
+          <div className="rounded-lg border border-border bg-surface p-5 shadow-sm border-l-4 border-l-slate-400">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-muted">Archived Exams</p>
+              <span className="flex h-2 w-2 rounded-full bg-slate-400" />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2 border-t border-border/50 pt-3">
+              <div>
+                <p className="text-xs text-muted">Total Exams</p>
+                <p className="text-xl font-black text-foreground">
+                  {totals.archivedExams || 0}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted">Past Attendees</p>
+                <p className="text-xl font-black text-foreground">
+                  {totals.archivedAttendees || 0}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
         <div>
           <p className="text-sm font-semibold text-brand-strong">
             Exam operations
@@ -796,29 +818,6 @@ export function ExamManager({
           <h1 className="mt-1 text-2xl font-black text-foreground sm:text-3xl">
             {pageConfig.title}
           </h1>
-        </div>
-
-        <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
-          <div className="border-r border-border px-5 py-5">
-            <p className="text-xs font-semibold text-muted">
-              {pageConfig.statLabel}
-            </p>
-            <p className="mt-2 text-2xl font-black text-foreground">
-              {totals.total}
-            </p>
-          </div>
-          <div className="border-r border-border px-5 py-5">
-            <p className="text-xs font-semibold text-muted">Active</p>
-            <p className="mt-2 text-2xl font-black text-foreground">
-              {totals.active}
-            </p>
-          </div>
-          <div className="px-5 py-5">
-            <p className="text-xs font-semibold text-muted">Inactive</p>
-            <p className="mt-2 text-2xl font-black text-foreground">
-              {totals.inactive}
-            </p>
-          </div>
         </div>
       </section>
 
@@ -855,34 +854,6 @@ export function ExamManager({
             searchPlaceholder="Search categories..."
           />
 
-          <HierarchicalCategoryDropdown
-            label="Subject"
-            options={subjectFilterOptions}
-            value={subjectFilter}
-            onChange={(option) =>
-              updateUrlFilters({
-                subjectID:
-                  option.value === ALL_EXAM_SUBJECT_VALUE ? "" : option.value,
-              })
-            }
-            placeholder="All subjects"
-            searchPlaceholder="Search subjects..."
-          />
-
-          <HierarchicalCategoryDropdown
-            label="Topic"
-            options={topicFilterOptions}
-            value={topicFilter}
-            onChange={(option) =>
-              updateUrlFilters({
-                topicID:
-                  option.value === ALL_EXAM_TOPIC_VALUE ? "" : option.value,
-              })
-            }
-            placeholder="All topics"
-            searchPlaceholder="Search topics..."
-          />
-
           <button
             type="button"
             className="button button-secondary min-h-11 md:self-end"
@@ -891,7 +862,7 @@ export function ExamManager({
             <RotateCcw size={15} />
             Reset
           </button>
-          <CreateExamMenu />
+          <CreateExamBtn />
         </div>
       </section>
 
