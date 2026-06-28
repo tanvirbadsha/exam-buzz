@@ -82,7 +82,7 @@ export default async function ExamsPage() {
   return (
     <Suspense fallback={null}>
       <ExamManager
-        examListType="all"
+        examListType="written"
         initialCategoriesData={categoriesData}
         initialExamsData={examsData}
         initialSubjectsData={subjectsData}

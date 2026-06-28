@@ -72,6 +72,14 @@ const EXAM_PAGE_CONFIG = {
     queryEndpointName: "getAllExams",
     useQuery: useGetAllExamsQuery,
   },
+  written: {
+    title: "Written Exams",
+    statLabel: "Exams",
+    listLabel: "Written exam list",
+    emptyMessage: "Adjust the filters or create a new exam.",
+    queryEndpointName: "getAllExams",
+    useQuery: useGetAllExamsQuery,
+  },
   upcoming: {
     title: "Upcoming Exams",
     statLabel: "Upcoming",
@@ -271,6 +279,24 @@ function ExamActionMenu({ exam, onDelete }) {
             <Trash2 size={15} />
             Delete
           </button>
+          <Link
+            href={`/exams/${exam.id}/merit-list`}
+            role="menuitem"
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted"
+            onClick={closeMenu}
+          >
+            <Pencil size={15} className="text-muted" />
+            Merit List
+          </Link>
+          <Link
+            href={`/exams/${exam.id}/assign-teacher`}
+            role="menuitem"
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted"
+            onClick={closeMenu}
+          >
+            <Pencil size={15} className="text-muted" />
+            Assign Teacher
+          </Link>
         </>
       )}
     </FloatingActionMenu>
@@ -868,12 +894,12 @@ export function ExamManager({
 
       <TableContainer>
         <div className="flex flex-col gap-1 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+          <div className="flex gap-2 items-center">
             <h2 className="text-base font-semibold text-foreground">
               {pageConfig.listLabel}
             </h2>
             <p className="text-sm text-muted">
-              {filteredExams.length} of {exams.length} exams shown
+              ({filteredExams.length} of {exams.length} exams shown)
             </p>
           </div>
           {isRefreshing && (
