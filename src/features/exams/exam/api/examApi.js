@@ -175,10 +175,10 @@ export const examApi = apiSlice.injectEndpoints({
         error ? [{ type: "Exam", id: String(id) }] : [],
     }),
     updateQuestionPdf: builder.mutation({
-      query: ({ id, ...data }) => ({
+      query: ({ id, body, ...data }) => ({
         url: `/exam/exams/update-question-pdf/${id}`,
         method: "PATCH",
-        body: data,
+        body: body || data,
       }),
       invalidatesTags: (_result, _error, { id }) => [
         { type: "Exam", id: "LIST" },
@@ -188,10 +188,10 @@ export const examApi = apiSlice.injectEndpoints({
       ],
     }),
     updateDemoAnswerPdf: builder.mutation({
-      query: ({ id, ...data }) => ({
+      query: ({ id, body, ...data }) => ({
         url: `/exam/exams/update-demo-answer-pdf/${id}`,
         method: "PATCH",
-        body: data,
+        body: body || data,
       }),
       invalidatesTags: (_result, _error, { id }) => [
         { type: "Exam", id: "LIST" },

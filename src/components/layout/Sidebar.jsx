@@ -40,7 +40,7 @@ const menuItems = [
       { label: "MCQ Exams", href: "/exams/mcq-exams", exact: true },
       { label: "Upcoming Exams", href: "/exams/upcoming-exams" },
       { label: "Live Exams", href: "/exams/live-exams" },
-      { label: "Sections", href: "/sections" },
+      { label: "Questions", href: "/questions" },
       { label: "Exam Types", href: "/exam-types" },
       // { label: "Question Bank", href: "/exams/questions" },
       // { label: "Results", href: "/exams/results" },

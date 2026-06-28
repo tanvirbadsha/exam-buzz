@@ -22,8 +22,11 @@ import {
   useGetAllExamsQuery,
   useGetLiveExamsQuery,
   useGetUpcomingExamsQuery,
+  useUpdateDemoAnswerPdfMutation,
   useUpdateExamStatusMutation,
+  useUpdateQuestionPdfMutation,
 } from "@/features/exams/exam/api/examApi";
+import { ExamQaUploadModal } from "@/features/exams/qa-upload/ExamQaUploadModal";
 import {
   getExamApiErrorMessage,
   getExamPagination,
@@ -43,7 +46,17 @@ import {
   getExamCategoryId,
   getExamPdfLabel,
 } from "@/lib/examData";
-import { Download, Eye, Pencil, RotateCcw, Search, Trash2 } from "lucide-react";
+import {
+  Download,
+  Eye,
+  Pencil,
+  RotateCcw,
+  Search,
+  Trash2,
+  Trophy,
+  UploadCloud,
+  UserCheck,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
@@ -244,9 +257,57 @@ function PdfLink({ href, label }) {
   );
 }
 
+function getExamParticipantCount(exam) {
+  const countFields = [
+    "participantsCount",
+    "participantCount",
+    "studentsParticipated",
+    "studentParticipated",
+    "attendedStudentsCount",
+    "attendeeCount",
+    "totalAttendees",
+    "totalParticipants",
+  ];
+
+  for (const field of countFields) {
+    const value = exam?.[field];
+    if (value !== undefined && value !== null && value !== "") {
+      const numericValue = Number(value);
+      return Number.isFinite(numericValue) ? numericValue : value;
+    }
+  }
+
+  const studentLists = [
+    exam?.participants,
+    exam?.students,
+    exam?.attendedStudents,
+    exam?.studentSubmissions,
+  ];
+  const studentList = studentLists.find(Array.isArray);
+
+  return studentList ? studentList.length : "N/A";
+}
+
+function QaUploadButton({ disabled, onClick }) {
+  return (
+    <button
+      type="button"
+      className="inline-flex w-fit items-center gap-1.5 rounded-md border border-border bg-surface px-2 py-1 text-[11px] font-bold text-foreground shadow-sm transition-colors hover:border-brand hover:text-brand-strong disabled:cursor-not-allowed disabled:opacity-60"
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <UploadCloud size={13} />
+      Upload file
+    </button>
+  );
+}
+
 function ExamActionMenu({ exam, onDelete }) {
   return (
-    <FloatingActionMenu ariaLabel={`Open actions for ${exam.name}`}>
+    <FloatingActionMenu
+      ariaLabel={`Open actions for ${exam.name}`}
+      menuHeight={236}
+    >
       {({ closeMenu }) => (
         <>
           <Link
@@ -285,7 +346,7 @@ function ExamActionMenu({ exam, onDelete }) {
             className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted"
             onClick={closeMenu}
           >
-            <Pencil size={15} className="text-muted" />
+            <Trophy size={15} className="text-muted" />
             Merit List
           </Link>
           <Link
@@ -294,7 +355,7 @@ function ExamActionMenu({ exam, onDelete }) {
             className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted"
             onClick={closeMenu}
           >
-            <Pencil size={15} className="text-muted" />
+            <UserCheck size={15} className="text-muted" />
             Assign Teacher
           </Link>
         </>
@@ -323,6 +384,7 @@ export function ExamManager({
   const subjectFilter = searchParams.get("subjectID") || ALL_EXAM_SUBJECT_VALUE;
   const topicFilter = searchParams.get("topicID") || ALL_EXAM_TOPIC_VALUE;
   const [pendingStatusIds, setPendingStatusIds] = useState(() => new Set());
+  const [uploadExam, setUploadExam] = useState(null);
   const [hasHydratedInitialData, setHasHydratedInitialData] = useState(
     () =>
       !initialExamsData ||
@@ -487,6 +549,10 @@ export function ExamManager({
   });
   const [deleteExam] = useDeleteExamMutation();
   const [updateExamStatus] = useUpdateExamStatusMutation();
+  const [updateQuestionPdf, { isLoading: isUpdatingQuestionPdf }] =
+    useUpdateQuestionPdfMutation();
+  const [updateDemoAnswerPdf, { isLoading: isUpdatingDemoAnswerPdf }] =
+    useUpdateDemoAnswerPdfMutation();
 
   const examsData = canUseInitialExamsData ? initialExamsData : queryExamsData;
   const categoriesData =
@@ -706,6 +772,34 @@ export function ExamManager({
     }
   };
 
+  const handleQaUpload = async ({ documentType, file }) => {
+    if (!uploadExam || !file) return;
+
+    const formData = new FormData();
+    const mutation =
+      documentType === "question"
+        ? updateQuestionPdf
+        : updateDemoAnswerPdf;
+    const bodyKey =
+      documentType === "question" ? "questionPDF" : "demoAnswerPDF";
+
+    formData.append(bodyKey, file, file.name);
+
+    try {
+      await mutation({ id: uploadExam.id, body: formData }).unwrap();
+      toast.success(
+        documentType === "question"
+          ? "Question file uploaded."
+          : "Demo answer file uploaded.",
+      );
+      setUploadExam(null);
+    } catch (uploadError) {
+      toast.error(
+        getExamApiErrorMessage(uploadError, "File could not be uploaded."),
+      );
+    }
+  };
+
   const activeInitialError =
     (!queryExamsData && initialExamsData?._error && initialExamsData) ||
     (!queryCategoriesData &&
@@ -914,13 +1008,14 @@ export function ExamManager({
         <div className="overflow-hidden">
           <Table className="table-fixed text-xs">
             <colgroup>
-              <col className="w-[18%]" />
-              <col className="w-[13%]" />
               <col className="w-[16%]" />
-              <col className="w-[17%]" />
-              <col className="w-[8%]" />
               <col className="w-[12%]" />
-              <col className="w-[9%]" />
+              <col className="w-[14%]" />
+              <col className="w-[15%]" />
+              <col className="w-[7%]" />
+              <col className="w-[8%]" />
+              <col className="w-[13%]" />
+              <col className="w-[8%]" />
               <col className="w-[7%]" />
             </colgroup>
             <TableHead>
@@ -944,6 +1039,11 @@ export function ExamManager({
                   Duration
                   <br />
                   (min)
+                </TableTh>
+                <TableTh className="px-3">
+                  Students
+                  <br />
+                  Participated
                 </TableTh>
                 <TableTh className="px-3">
                   Question &<br />
@@ -1029,6 +1129,9 @@ export function ExamManager({
                       <TableTd className="px-3 align-top font-semibold text-foreground">
                         {exam.durationIntMinutes}
                       </TableTd>
+                      <TableTd className="px-3 align-top font-semibold text-foreground">
+                        {getExamParticipantCount(exam)}
+                      </TableTd>
                       <TableTd className="px-3 align-top">
                         <div className="flex min-w-0 flex-col gap-1.5">
                           <PdfLink
@@ -1045,6 +1148,14 @@ export function ExamManager({
                               "View answer",
                             )}
                           />
+                          {(!exam.questionPDF || !exam.demoAnswerPDF) && (
+                            <QaUploadButton
+                              disabled={
+                                isUpdatingQuestionPdf || isUpdatingDemoAnswerPdf
+                              }
+                              onClick={() => setUploadExam(exam)}
+                            />
+                          )}
                         </div>
                       </TableTd>
                       <TableTd className="px-3 align-top">
@@ -1070,7 +1181,7 @@ export function ExamManager({
                 })
               ) : (
                 <TableRow>
-                  <TableTd colSpan={8} className="py-12 text-center">
+                  <TableTd colSpan={9} className="py-12 text-center">
                     <p className="font-semibold text-foreground">
                       No exams found
                     </p>
@@ -1084,6 +1195,15 @@ export function ExamManager({
           </Table>
         </div>
       </TableContainer>
+
+      {uploadExam && (
+        <ExamQaUploadModal
+          exam={uploadExam}
+          isSubmitting={isUpdatingQuestionPdf || isUpdatingDemoAnswerPdf}
+          onClose={() => setUploadExam(null)}
+          onSubmit={handleQaUpload}
+        />
+      )}
     </div>
   );
 }

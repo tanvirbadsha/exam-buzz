@@ -1,5 +1,7 @@
-import React from "react";
+import { AssignTeacherPage } from "@/features/exams/assign-teacher/AssignTeacherPage";
 
-export default function AssignTeacherPage() {
-  return <div>page</div>;
+export default async function AssignTeacherRoute({ params }) {
+  const { examId } = await params;
+
+  return <AssignTeacherPage examId={examId} />;
 }
