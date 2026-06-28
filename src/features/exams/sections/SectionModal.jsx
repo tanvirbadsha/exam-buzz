@@ -30,7 +30,7 @@ function buildErrors(form, examIds) {
   }
 
   if (!form.name.trim()) {
-    errors.name = { message: "Section name is required." };
+    errors.name = { message: "Question name is required." };
   }
 
   if (!Number.isInteger(maxPapers) || maxPapers < 1) {
@@ -101,18 +101,18 @@ function SectionModalForm({
         />
 
         <TextInput
-          label="Section name"
-          name="section-name"
+          label="Question name"
+          name="question-name"
           icon={FileText}
           value={form.name}
           onChange={(event) => updateField("name", event.target.value)}
           error={errors.name}
-          placeholder="Paper Section A"
+          placeholder="Paper Question A"
         />
 
         <TextInput
           label="Max paper count"
-          name="section-max-papers"
+          name="question-max-papers"
           icon={Hash}
           type="number"
           min="1"
@@ -144,12 +144,14 @@ function SectionModalForm({
               : "Creating..."
             : isEditMode
               ? "Save changes"
-              : "Create section"}
+              : "Create question"}
         </button>
       </div>
     </form>
   );
 }
+
+export { SectionModalForm, buildErrors, buildInitialForm };
 
 export function SectionModal({
   examOptions,
@@ -176,7 +178,7 @@ export function SectionModal({
   if (!isOpen) return null;
 
   const isEditMode = mode === "edit";
-  const title = isEditMode ? "Edit section" : "Create section";
+  const title = isEditMode ? "Edit question" : "Create question";
   const formKey = `${mode}-${section?.id || "new"}`;
 
   return (
@@ -184,32 +186,32 @@ export function SectionModal({
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 px-4 py-6 backdrop-blur-[2px] sm:py-10"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="section-modal-title"
+      aria-labelledby="question-modal-title"
     >
       <button
         type="button"
         className="fixed inset-0 cursor-default"
-        aria-label="Close section modal"
+        aria-label="Close question modal"
         onClick={onClose}
       />
       <div className="relative w-full max-w-lg overflow-hidden rounded-lg border border-border bg-surface shadow-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-border bg-surface-muted px-5 py-4">
           <div className="min-w-0">
             <h2
-              id="section-modal-title"
+              id="question-modal-title"
               className="text-lg font-bold text-foreground"
             >
               {title}
             </h2>
             <p className="mt-1 text-sm text-muted">
-              Select an exam and define how many papers the section can hold.
+              Select an exam and define how many papers the question can hold.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="icon-button h-9 w-9"
-            aria-label="Close section modal"
+            aria-label="Close question modal"
           >
             <X size={18} />
           </button>

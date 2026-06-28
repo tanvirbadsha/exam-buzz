@@ -15,7 +15,6 @@ import {
 import { HierarchicalCategoryDropdown } from "@/features/categories/HierarchicalCategoryDropdown";
 import { useGetAllExamsQuery } from "@/features/exams/exam/api/examApi";
 import {
-  useCreateSectionMutation,
   useDeleteSectionMutation,
   useGetAllSectionsQuery,
   useUpdateSectionMutation,
@@ -137,7 +136,7 @@ function SectionActionMenu({ onDelete, onEdit, section }) {
       {({ closeMenu }) => (
         <>
           <Link
-            href={`/sections/${section.id}/view`}
+            href={`/questions/${section.id}/view`}
             role="menuitem"
             className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted"
             onClick={closeMenu}
@@ -245,7 +244,7 @@ export function SectionManager() {
   const [currentPage, setCurrentPage] = useState(1);
   const [modalState, setModalState] = useState({
     isOpen: false,
-    mode: "create",
+    mode: "edit",
     section: null,
   });
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 350);
@@ -260,8 +259,6 @@ export function SectionManager() {
     page: 1,
     limit: EXAM_OPTIONS_LIMIT,
   });
-  const [createSection, { isLoading: isCreating }] =
-    useCreateSectionMutation();
   const [updateSection, { isLoading: isUpdating }] =
     useUpdateSectionMutation();
   const [deleteSection, { isLoading: isDeleting }] =
@@ -272,7 +269,7 @@ export function SectionManager() {
     [sectionsData],
   );
   const exams = useMemo(() => getExamsFromResponse(examsData), [examsData]);
-  const isSubmitting = isCreating || isUpdating;
+  const isSubmitting = isUpdating;
   const isBusy = isSubmitting || isDeleting;
 
   const examsById = useMemo(
@@ -373,10 +370,6 @@ export function SectionManager() {
     setCurrentPage(1);
   };
 
-  const openCreateModal = () => {
-    setModalState({ isOpen: true, mode: "create", section: null });
-  };
-
   const openEditModal = (section) => {
     setModalState({ isOpen: true, mode: "edit", section });
   };
@@ -390,7 +383,7 @@ export function SectionManager() {
       const body = buildSectionUpdateBody(modalState.section, sectionInput);
 
       if (Object.keys(body).length === 0) {
-        toast.success("No section changes to save.");
+        toast.success("No question changes to save.");
         return true;
       }
 
@@ -405,25 +398,13 @@ export function SectionManager() {
         return true;
       } catch (error) {
         toast.error(
-          getApiErrorMessage(error, "Section could not be updated."),
+          getApiErrorMessage(error, "Question could not be updated."),
         );
         return false;
       }
     }
 
-    const payload = buildSectionPayload(sectionInput);
-
-    try {
-      const response = await createSection(payload).unwrap();
-      toast.success(`${response?.section?.name || payload.name} created.`);
-      resetFilters();
-      return true;
-    } catch (error) {
-      toast.error(
-        getApiErrorMessage(error, "Section could not be created."),
-      );
-      return false;
-    }
+    return false;
   };
 
   const handleDelete = async (section) => {
@@ -438,7 +419,7 @@ export function SectionManager() {
       }
     } catch (error) {
       toast.error(
-        getApiErrorMessage(error, "Section could not be deleted."),
+        getApiErrorMessage(error, "Question could not be deleted."),
       );
     }
   };
@@ -451,18 +432,18 @@ export function SectionManager() {
             Exam management
           </p>
           <h1 className="mt-1 text-2xl font-black text-foreground sm:text-3xl">
-            Sections
+            Questions
           </h1>
         </div>
         <div
           className="mx-auto w-full max-w-3xl rounded-lg border border-rose-200 bg-rose-50 px-5 py-6 text-rose-950"
           role="alert"
         >
-          <h2 className="text-base font-bold">Unable to load sections</h2>
+          <h2 className="text-base font-bold">Unable to load questions</h2>
           <p className="mt-1 text-sm leading-6 text-rose-800">
             {getApiErrorMessage(
               sectionsError,
-              "The section list could not be loaded.",
+              "The question list could not be loaded.",
             )}
           </p>
           <button
@@ -485,13 +466,13 @@ export function SectionManager() {
             Exam management
           </p>
           <h1 className="mt-1 text-2xl font-black text-foreground sm:text-3xl">
-            Sections
+            Questions
           </h1>
         </div>
         <div className="surface-card py-12 text-center">
-          <p className="font-semibold text-foreground">Loading sections...</p>
+          <p className="font-semibold text-foreground">Loading questions...</p>
           <p className="mt-1 text-sm text-muted">
-            Fetching sections and exam options.
+            Fetching questions and exam options.
           </p>
         </div>
       </div>
@@ -499,14 +480,14 @@ export function SectionManager() {
   }
 
   const sectionsSummary = isFetchingSections
-    ? "Refreshing sections..."
-    : `${filteredSections.length} of ${sections.length} sections shown`;
+    ? "Refreshing questions..."
+    : `${filteredSections.length} of ${sections.length} questions shown`;
 
   const examDropdownPlaceholder = isFetchingExams
     ? "Loading exams..."
     : "All exams";
 
-  const canCreateSection = examOptions.length > 0 && !isFetchingExams;
+  const canCreateQuestion = examOptions.length > 0 && !isFetchingExams;
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
@@ -516,7 +497,7 @@ export function SectionManager() {
             Exam management
           </p>
           <h1 className="mt-1 text-2xl font-black text-foreground sm:text-3xl">
-            Sections
+            Questions
           </h1>
         </div>
 
@@ -541,7 +522,7 @@ export function SectionManager() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
               <h2 className="text-base font-semibold text-foreground">
-                Section list
+                Question list
               </h2>
               <p className="text-sm text-muted">
                 {sectionsSummary}
@@ -550,10 +531,10 @@ export function SectionManager() {
 
             <div className="grid w-full gap-3 sm:grid-cols-2 sm:items-end xl:grid-cols-[minmax(16rem,1fr)_minmax(14rem,16rem)_auto_auto] lg:min-w-0 lg:flex-1">
               <CustomSearch
-                placeholder="Search by section, exam, or ID..."
+                placeholder="Search by question, exam, or ID..."
                 searchQuery={searchQuery}
                 setSearchQuery={handleSearchChange}
-                ariaLabel="Search sections"
+                ariaLabel="Search questions"
                 wide
               />
               <HierarchicalCategoryDropdown
@@ -573,15 +554,19 @@ export function SectionManager() {
                 <RotateCcw size={15} />
                 Reset
               </button>
-              <button
-                type="button"
+              <Link
+                href="/questions/create"
                 className="button button-primary min-h-10 sm:self-end"
-                onClick={openCreateModal}
-                disabled={!canCreateSection || isBusy}
+                aria-disabled={!canCreateQuestion || isBusy}
+                onClick={(event) => {
+                  if (!canCreateQuestion || isBusy) {
+                    event.preventDefault();
+                  }
+                }}
               >
                 <Plus size={16} />
-                Create section
-              </button>
+                Create Question
+              </Link>
             </div>
           </div>
         </div>
@@ -602,10 +587,10 @@ export function SectionManager() {
                 <FileText size={20} />
               </div>
               <p className="mt-3 font-semibold text-foreground">
-                No sections found
+                No questions found
               </p>
               <p className="mt-1 text-sm text-muted">
-                Adjust the filters or create a section.
+                Adjust the filters or create a question.
               </p>
             </div>
           )}
@@ -625,7 +610,7 @@ export function SectionManager() {
             <TableHead>
               <tr>
                 <TableTh className="px-2">Serial</TableTh>
-                <TableTh className="px-2">Section</TableTh>
+                <TableTh className="px-2">Question</TableTh>
                 <TableTh className="px-2">Exam</TableTh>
                 <TableTh className="px-2">Max papers</TableTh>
                 <TableTh className="px-2">Created</TableTh>
@@ -690,10 +675,10 @@ export function SectionManager() {
                       <FileText size={20} />
                     </div>
                     <p className="mt-3 font-semibold text-foreground">
-                      No sections found
+                      No questions found
                     </p>
                     <p className="mt-1 text-sm text-muted">
-                      Adjust the filters or create a section.
+                      Adjust the filters or create a question.
                     </p>
                   </TableTd>
                 </TableRow>

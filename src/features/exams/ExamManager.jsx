@@ -26,7 +26,6 @@ import {
   useUpdateExamStatusMutation,
   useUpdateQuestionPdfMutation,
 } from "@/features/exams/exam/api/examApi";
-import { ExamQaUploadModal } from "@/features/exams/qa-upload/ExamQaUploadModal";
 import {
   getExamApiErrorMessage,
   getExamPagination,
@@ -37,6 +36,7 @@ import {
   normalizeExamSubjects,
   normalizeExamTopics,
 } from "@/features/exams/exam/examUtils";
+import { ExamQaUploadModal } from "@/features/exams/qa-upload/ExamQaUploadModal";
 import { subjectsApi } from "@/features/subjects/api/subjectsApi";
 import { topicsApi } from "@/features/topics/api/topicsApi";
 import {
@@ -49,6 +49,7 @@ import {
 import {
   Download,
   Eye,
+  FileQuestion,
   Pencil,
   RotateCcw,
   Search,
@@ -357,6 +358,15 @@ function ExamActionMenu({ exam, onDelete }) {
           >
             <UserCheck size={15} className="text-muted" />
             Assign Teacher
+          </Link>
+          <Link
+            href={`/exams/${exam.id}/add-question`}
+            role="menuitem"
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted"
+            onClick={closeMenu}
+          >
+            <FileQuestion size={15} className="text-muted" />
+            Add Questions
           </Link>
         </>
       )}
@@ -777,9 +787,7 @@ export function ExamManager({
 
     const formData = new FormData();
     const mutation =
-      documentType === "question"
-        ? updateQuestionPdf
-        : updateDemoAnswerPdf;
+      documentType === "question" ? updateQuestionPdf : updateDemoAnswerPdf;
     const bodyKey =
       documentType === "question" ? "questionPDF" : "demoAnswerPDF";
 

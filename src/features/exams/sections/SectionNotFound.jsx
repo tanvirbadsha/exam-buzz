@@ -8,14 +8,14 @@ export function SectionNotFound() {
         <FileQuestion size={24} />
       </div>
       <h1 className="mt-4 text-xl font-bold text-foreground">
-        Section not found
+        Question not found
       </h1>
       <p className="mt-2 max-w-md text-sm leading-6 text-muted">
-        This section does not exist or was removed from the local section list.
+        This question does not exist or was removed from the question list.
       </p>
-      <Link href="/sections" className="button button-primary mt-6">
+      <Link href="/questions" className="button button-primary mt-6">
         <ArrowLeft size={16} />
-        Back to sections
+        Back to questions
       </Link>
     </div>
   );
