@@ -2,10 +2,13 @@
 
 import { ErrorCard } from "@/components/ui/ErrorCard";
 import { GlobalSpinner } from "@/components/ui/GlobalSpinner";
-import { HierarchicalCategoryDropdown } from "@/features/categories/HierarchicalCategoryDropdown";
-import { useGetAllExamsQuery } from "@/features/exams/exam/api/examApi";
-import { useCreateSectionMutation } from "@/features/exams/sections/api/sectionApi";
 import { TextInput } from "@/components/ui/forms/TextInput";
+import { HierarchicalCategoryDropdown } from "@/features/categories/HierarchicalCategoryDropdown";
+import {
+  useGetAllExamsQuery,
+  useGetExamByIdQuery,
+} from "@/features/exams/exam/api/examApi";
+import { useCreateSectionMutation } from "@/features/exams/sections/api/sectionApi";
 import { BookOpenCheck, FileText, Hash, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -26,6 +29,10 @@ function getExamName(exam) {
 
 function getExamsFromResponse(response) {
   return Array.isArray(response?.exams) ? response.exams : [];
+}
+
+function getExamFromResponse(response) {
+  return response?.exam || response || null;
 }
 
 function normalizeApiId(value) {
@@ -78,9 +85,10 @@ function getApiErrorMessage(error, fallbackMessage) {
 
 export function QuestionFormPage({ initialExamId = "" }) {
   const router = useRouter();
+  const normalizedInitialExamId = initialExamId ? String(initialExamId) : "";
   const [form, setForm] = useState(() => ({
     ...emptyForm,
-    examID: initialExamId ? String(initialExamId) : "",
+    examID: normalizedInitialExamId,
   }));
   const [errors, setErrors] = useState({});
   const {
@@ -93,17 +101,38 @@ export function QuestionFormPage({ initialExamId = "" }) {
     page: 1,
     limit: EXAM_OPTIONS_LIMIT,
   });
+  const { data: initialExamData } = useGetExamByIdQuery(
+    normalizedInitialExamId,
+    {
+      skip: !normalizedInitialExamId,
+    },
+  );
   const [createSection, { isLoading: isCreating }] =
     useCreateSectionMutation();
 
-  const exams = useMemo(() => getExamsFromResponse(examsData), [examsData]);
+  const exams = useMemo(() => {
+    const listExams = getExamsFromResponse(examsData);
+    const routeExam = getExamFromResponse(initialExamData);
+
+    if (
+      !routeExam?.id ||
+      listExams.some((exam) => String(exam.id) === String(routeExam.id))
+    ) {
+      return listExams;
+    }
+
+    return [routeExam, ...listExams];
+  }, [examsData, initialExamData]);
   const examOptions = useMemo(() => buildExamOptions(exams), [exams]);
   const examIds = useMemo(
     () => new Set(examOptions.map((option) => String(option.value))),
     [examOptions],
   );
   const selectedExam = useMemo(
-    () => examOptions.find((option) => String(option.value) === String(form.examID)),
+    () =>
+      examOptions.find(
+        (option) => String(option.value) === String(form.examID),
+      ),
     [examOptions, form.examID],
   );
 

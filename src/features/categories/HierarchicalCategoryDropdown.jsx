@@ -71,7 +71,11 @@ function buildOptionTree(options) {
 
 function getAncestorValues(nodesByValue, value) {
   const ancestors = [];
-  let currentNode = nodesByValue.get(value);
+  let currentNode =
+    nodesByValue.get(value) ||
+    Array.from(nodesByValue.values()).find(
+      (node) => String(node.value) === String(value),
+    );
 
   while (currentNode?.parentValue) {
     ancestors.unshift(currentNode.parentValue);
@@ -142,7 +146,8 @@ export function HierarchicalCategoryDropdown({
     [options],
   );
   const selectedOption = useMemo(
-    () => options.find((option) => option.value === value) || null,
+    () =>
+      options.find((option) => String(option.value) === String(value)) || null,
     [options, value],
   );
   const selectedAncestorValues = useMemo(
@@ -408,7 +413,7 @@ export function HierarchicalCategoryDropdown({
             >
               {visibleOptions.length > 0 ? (
                 visibleOptions.map((option, index) => {
-                  const isSelected = option.value === value;
+                  const isSelected = String(option.value) === String(value);
                   const isHighlighted = index === activeHighlightedIndex;
                   const depth = Math.max(0, Number(option.depth) || 0);
                   const hasChildren = option.children?.length > 0;
