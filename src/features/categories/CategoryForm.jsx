@@ -99,6 +99,13 @@ export function CategoryForm({
           error={errors.name}
           placeholder="BCS Preliminary"
         />
+        <CustomDropdown
+          label="Exam Type"
+          options={statusOptions}
+          value={form.status}
+          onChange={(option) => updateField("status", option.value)}
+          placeholder="Select exam type"
+        />
 
         <HierarchicalCategoryDropdown
           label="Parent category"
