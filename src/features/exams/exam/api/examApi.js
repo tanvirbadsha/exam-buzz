@@ -4,7 +4,7 @@ export const examApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     createExam: builder.mutation({
       query: (data) => ({
-        url: "/exam/exams/create-exam",
+        url: "/exam/written/create-written-exam",
         method: "POST",
         body: data,
       }),
@@ -23,8 +23,8 @@ export const examApi = apiSlice.injectEndpoints({
         const queryString = params.toString();
         return {
           url: queryString
-            ? `/exam/exams/get-all-exams?${queryString}`
-            : "/exam/exams/get-all-exams",
+            ? `/exam/written/get-all-written-exams?${queryString}`
+            : "/exam/written/get-all-written-exams",
           method: "GET",
         };
       },
@@ -49,8 +49,8 @@ export const examApi = apiSlice.injectEndpoints({
         const queryString = params.toString();
         return {
           url: queryString
-            ? `/exam/exams/get-upcoming-exams?${queryString}`
-            : "/exam/exams/get-upcoming-exams",
+            ? `/exam/written/get-upcoming-written-exams?${queryString}`
+            : "/exam/written/get-upcoming-written-exams",
           method: "GET",
         };
       },
@@ -75,8 +75,8 @@ export const examApi = apiSlice.injectEndpoints({
         const queryString = params.toString();
         return {
           url: queryString
-            ? `/exam/exams/get-live-exams?${queryString}`
-            : "/exam/exams/get-live-exams",
+            ? `/exam/written/get-live-written-exams?${queryString}`
+            : "/exam/written/get-live-written-exams",
           method: "GET",
         };
       },
@@ -90,16 +90,14 @@ export const examApi = apiSlice.injectEndpoints({
     }),
     getExamById: builder.query({
       query: (id) => ({
-        url: `/exam/exams/get-exam/${id}`,
+        url: `/exam/written/get-written-exam/${id}`,
         method: "GET",
       }),
-      providesTags: (_result, _error, id) => [
-        { type: "Exam", id: String(id) },
-      ],
+      providesTags: (_result, _error, id) => [{ type: "Exam", id: String(id) }],
     }),
     updateExam: builder.mutation({
       query: ({ id, body, ...data }) => ({
-        url: `/exam/exams/update-exam/${id}`,
+        url: `/exam/written/update-written-exam/${id}`,
         method: "PATCH",
         body: body || data,
       }),
@@ -112,7 +110,7 @@ export const examApi = apiSlice.injectEndpoints({
     }),
     updateExamStatus: builder.mutation({
       query: ({ id, ...data }) => ({
-        url: `/exam/exams/update-exam-status/${id}`,
+        url: `/exam/written/update-written-exam-status/${id}`,
         method: "PATCH",
         body: data,
       }),
@@ -176,7 +174,7 @@ export const examApi = apiSlice.injectEndpoints({
     }),
     updateQuestionPdf: builder.mutation({
       query: ({ id, body, ...data }) => ({
-        url: `/exam/exams/update-question-pdf/${id}`,
+        url: `/exam/written/update-question-pdf/${id}`,
         method: "PATCH",
         body: body || data,
       }),
@@ -189,7 +187,7 @@ export const examApi = apiSlice.injectEndpoints({
     }),
     updateDemoAnswerPdf: builder.mutation({
       query: ({ id, body, ...data }) => ({
-        url: `/exam/exams/update-demo-answer-pdf/${id}`,
+        url: `/exam/written/update-demo-answer-pdf/${id}`,
         method: "PATCH",
         body: body || data,
       }),
@@ -202,7 +200,7 @@ export const examApi = apiSlice.injectEndpoints({
     }),
     deleteExam: builder.mutation({
       query: (id) => ({
-        url: `/exam/exams/delete-exam/${id}`,
+        url: `/exam/written/delete-written-exam/${id}`,
         method: "DELETE",
       }),
       invalidatesTags: (_result, _error, id) => [

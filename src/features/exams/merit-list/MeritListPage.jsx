@@ -52,7 +52,9 @@ function FilePill({ fileName, checked = false }) {
 
 function FileList({ emptyText, files, checked = false }) {
   if (!files.length) {
-    return <span className="text-xs font-semibold text-muted">{emptyText}</span>;
+    return (
+      <span className="text-xs font-semibold text-muted">{emptyText}</span>
+    );
   }
 
   return (
@@ -92,18 +94,23 @@ export function MeritListPage({ examId }) {
             <h1 className="mt-1 text-2xl font-black text-foreground sm:text-3xl">
               Merit list
             </h1>
-            <p className="mt-1 text-sm text-muted">Exam ID: {examId}</p>
+            {/* <p className="mt-1 text-sm text-muted">Exam ID: {examId}</p> */}
           </div>
-          <button
-            type="button"
-            className="button button-primary w-full sm:w-auto"
-            onClick={() =>
-              toast("Download zip will be connected when the API is ready.")
-            }
-          >
-            <Download size={16} />
-            Download zip
-          </button>
+          <div>
+            <h1 className="mt-1 text-2xl font-black text-foreground sm:text-3xl">
+              Exam Name
+            </h1>
+            <button
+              type="button"
+              className="button button-primary w-full sm:w-auto"
+              onClick={() =>
+                toast("Download zip will be connected when the API is ready.")
+              }
+            >
+              <Download size={16} />
+              Download zip
+            </button>
+          </div>
         </div>
       </div>
 
@@ -125,6 +132,7 @@ export function MeritListPage({ examId }) {
           <Table className="min-w-[900px]">
             <TableHead>
               <tr>
+                <TableTh>Position</TableTh>
                 <TableTh>Student</TableTh>
                 <TableTh>Marks</TableTh>
                 <TableTh>Student submission</TableTh>
@@ -135,6 +143,7 @@ export function MeritListPage({ examId }) {
             <TableBody>
               {mockMeritStudents.map((student) => (
                 <TableRow key={student.id}>
+                  <TableTd>01</TableTd>
                   <TableTd>
                     <div>
                       <p className="font-semibold text-foreground">

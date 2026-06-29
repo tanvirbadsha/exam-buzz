@@ -3,12 +3,6 @@
 import { ErrorCard } from "@/components/ui/ErrorCard";
 import { GlobalSpinner } from "@/components/ui/GlobalSpinner";
 import { categoryApi } from "@/features/categories/api/categoryApi";
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import toast from "react-hot-toast";
-import { useDispatch } from "react-redux";
 import { ExamForm } from "@/features/exams/ExamForm";
 import {
   useCreateExamMutation,
@@ -27,8 +21,18 @@ import {
   normalizeExamSubjects,
   normalizeExamTopics,
 } from "@/features/exams/exam/examUtils";
+import {
+  QuickCreateMenu,
+  QuickCreateMenuItem,
+} from "@/features/exams/ui/QuickCreateMenu";
 import { subjectsApi } from "@/features/subjects/api/subjectsApi";
 import { topicsApi } from "@/features/topics/api/topicsApi";
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
+import { useDispatch } from "react-redux";
 
 const LOOKUP_LIMIT = 1000;
 const INITIAL_LOOKUP_QUERY_ARGS = {
@@ -125,8 +129,8 @@ export function ExamFormPage({
       !initialTopicsData ||
       Boolean(
         initialCategoriesData?._error ||
-          initialSubjectsData?._error ||
-          initialTopicsData?._error,
+        initialSubjectsData?._error ||
+        initialTopicsData?._error,
       ),
   );
 
@@ -241,7 +245,9 @@ export function ExamFormPage({
   );
   const subjects = useMemo(
     () =>
-      normalizeExamSubjects(getLookupItemsFromResponse(subjectsData, "subjects")),
+      normalizeExamSubjects(
+        getLookupItemsFromResponse(subjectsData, "subjects"),
+      ),
     [subjectsData],
   );
   const topics = useMemo(
@@ -260,22 +266,19 @@ export function ExamFormPage({
     () => buildCategoryOptions(categoryIndex.childrenMap),
     [categoryIndex.childrenMap],
   );
-  const packageOptions = useMemo(
-    () => {
-      const staticOptions = [
-        { label: "No package", value: "__no_package__" },
-        ...initialPackages.map((packageInfo, index) => ({
+  const packageOptions = useMemo(() => {
+    const staticOptions = [
+      { label: "No package", value: "__no_package__" },
+      ...initialPackages.map((packageInfo, index) => ({
         label: packageInfo.title,
         value: packageInfo.id ?? `package-${index}`,
         meta: packageInfo.status,
         searchText: `${packageInfo.title} ${packageInfo.status} ${packageInfo.packageType}`,
       })),
-      ];
+    ];
 
-      return uniqueOptionsByValue(staticOptions);
-    },
-    [initialPackages],
-  );
+    return uniqueOptionsByValue(staticOptions);
+  }, [initialPackages]);
   const exam = isEditMode ? normalizeExam(getExamFromResponse(examData)) : null;
 
   const handleSubmit = async (examInput) => {
@@ -289,7 +292,8 @@ export function ExamFormPage({
 
       try {
         const response = await updateExam({ id: exam.id, body }).unwrap();
-        const updatedExam = normalizeExam(getExamFromResponse(response)) || exam;
+        const updatedExam =
+          normalizeExam(getExamFromResponse(response)) || exam;
         toast.success(`${updatedExam.name} updated.`);
         router.push("/exams");
       } catch (updateError) {
@@ -302,7 +306,9 @@ export function ExamFormPage({
     }
 
     try {
-      const response = await createExam(buildExamCreateBody(examInput)).unwrap();
+      const response = await createExam(
+        buildExamCreateBody(examInput),
+      ).unwrap();
       const createdExam =
         normalizeExam(getExamFromResponse(response)) || examInput;
       toast.success(`${createdExam.name} created.`);
@@ -318,7 +324,9 @@ export function ExamFormPage({
     (!queryCategoriesData &&
       initialCategoriesData?._error &&
       initialCategoriesData) ||
-    (!querySubjectsData && initialSubjectsData?._error && initialSubjectsData) ||
+    (!querySubjectsData &&
+      initialSubjectsData?._error &&
+      initialSubjectsData) ||
     (!queryTopicsData && initialTopicsData?._error && initialTopicsData) ||
     null;
   const activeError =
@@ -384,10 +392,23 @@ export function ExamFormPage({
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <div>
-        <Link href="/exams" className="back-link">
-          <ArrowLeft size={16} />
-          Back to exams
-        </Link>
+        <div className="flex justify-between gap-5 items-center">
+          <Link href="/exams" className="back-link">
+            <ArrowLeft size={16} />
+            Back to exams
+          </Link>
+          <QuickCreateMenu>
+            <QuickCreateMenuItem href="/categories">
+              Category
+            </QuickCreateMenuItem>
+            <QuickCreateMenuItem href="/subjects">Subject</QuickCreateMenuItem>
+            <QuickCreateMenuItem href="/topics">Topic</QuickCreateMenuItem>
+            <QuickCreateMenuItem href="/package-management/packages">
+              Package
+            </QuickCreateMenuItem>
+          </QuickCreateMenu>
+        </div>
+
         <div className="mt-5 flex flex-wrap items-end justify-between gap-3">
           <p className="text-sm font-semibold text-brand-strong">
             {mode === "edit" ? "Update exam" : "New exam"}

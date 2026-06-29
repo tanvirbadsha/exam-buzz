@@ -42,7 +42,7 @@ async function getExamPageData() {
   const [examsData, categoriesData, subjectsData, topicsData] =
     await Promise.all([
       safeSsrFetch(
-        `/exam/exams/get-all-exams?${examParams}`,
+        `/exam/written/get-all-written-exams?${examParams}`,
         "exams",
         "Unable to load exams.",
         EXAM_LIST_LIMIT,
