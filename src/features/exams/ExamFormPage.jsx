@@ -295,7 +295,7 @@ export function ExamFormPage({
         const updatedExam =
           normalizeExam(getExamFromResponse(response)) || exam;
         toast.success(`${updatedExam.name} updated.`);
-        router.push("/exams");
+        router.push("/exams/written-exams");
       } catch (updateError) {
         toast.error(
           getExamApiErrorMessage(updateError, "Failed to update exam."),
@@ -312,7 +312,7 @@ export function ExamFormPage({
       const createdExam =
         normalizeExam(getExamFromResponse(response)) || examInput;
       toast.success(`${createdExam.name} created.`);
-      router.push("/exams");
+      router.push("/exams/written-exams");
     } catch (createError) {
       toast.error(
         getExamApiErrorMessage(createError, "Failed to create exam."),
