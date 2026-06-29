@@ -334,8 +334,9 @@ export default function MultiSelectDropdown({
                       <input
                         type="checkbox"
                         checked={checked}
-                        onChange={() => {}} // Controlled reactively by row click
+                        onChange={() => {}}
                         className="h-4 w-4 rounded border-border text-brand focus:ring-0 pointer-events-none"
+                        style={{ accentColor: "var(--color-brand)" }}
                       />
                       <span className="min-w-0 flex-1 truncate select-none">
                         {option.label}

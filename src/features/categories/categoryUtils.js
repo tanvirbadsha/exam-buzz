@@ -56,6 +56,9 @@ export function buildCategoryCreateFormData(categoryInput) {
   formData.append("status", String(categoryInput.status === "active"));
   appendIfPresent(formData, "parentID", categoryInput.parentID);
   appendIfPresent(formData, "icon", categoryInput.icon);
+  if (categoryInput.examTypes?.length) {
+    formData.append("examTypes", JSON.stringify(categoryInput.examTypes));
+  }
 
   return formData;
 }
@@ -74,6 +77,9 @@ export function buildCategoryUpdateFormData(categoryInput, currentCategory) {
   }
 
   appendIfPresent(formData, "icon", categoryInput.icon);
+  if (categoryInput.examTypes !== undefined) {
+    formData.append("examTypes", JSON.stringify(categoryInput.examTypes));
+  }
 
   return formData;
 }

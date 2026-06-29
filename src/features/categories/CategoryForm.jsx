@@ -3,6 +3,7 @@
 import { CustomDropdown } from "@/components/ui/forms/CustomDropdown";
 import { FileUpload } from "@/components/ui/forms/FileUpload";
 import { TextInput } from "@/components/ui/forms/TextInput";
+import MultiSelectDropdown from "@/components/ui/MultiSelectDropdown";
 import { CATEGORY_STATUS_OPTIONS } from "@/lib/categoryData";
 import { FileText } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -19,6 +20,7 @@ const emptyCategory = {
   parentId: ROOT_PARENT_VALUE,
   status: "active",
   icon: null,
+  examTypes: [],
 };
 
 function buildInitialForm(category, defaultParentId) {
@@ -35,6 +37,7 @@ function buildInitialForm(category, defaultParentId) {
     parentId: category.parentId || ROOT_PARENT_VALUE,
     status: category.status ? "active" : "inactive",
     icon: null,
+    examTypes: category.examTypes || [],
   };
 }
 
@@ -57,6 +60,9 @@ export function CategoryForm({
   isSubmitting = false,
   mode = "create",
   submitLabel = "Save category",
+  examTypes = [],
+  examTypeOptions = [],
+  onExamTypesChange,
 }) {
   const initialForm = useMemo(
     () => buildInitialForm(category, defaultParentId),
@@ -74,6 +80,11 @@ export function CategoryForm({
     });
   };
 
+  const handleExamTypesChange = (nextExamTypes) => {
+    updateField("examTypes", nextExamTypes);
+    onExamTypesChange?.(nextExamTypes);
+  };
+
   const handleSubmit = (event) => {
     event.preventDefault();
     const nextErrors = buildErrors(form);
@@ -84,6 +95,7 @@ export function CategoryForm({
     onSubmit({
       ...form,
       parentID: form.parentId === ROOT_PARENT_VALUE ? null : form.parentId,
+      examTypes: form.examTypes.map(Number),
     });
   };
 
@@ -99,12 +111,12 @@ export function CategoryForm({
           error={errors.name}
           placeholder="BCS Preliminary"
         />
-        <CustomDropdown
+        <MultiSelectDropdown
           label="Exam Type"
-          options={statusOptions}
-          value={form.status}
-          onChange={(option) => updateField("status", option.value)}
-          placeholder="Select exam type"
+          options={examTypeOptions}
+          value={form.examTypes}
+          onChange={handleExamTypesChange}
+          placeholder="Select exam types"
         />
 
         <HierarchicalCategoryDropdown

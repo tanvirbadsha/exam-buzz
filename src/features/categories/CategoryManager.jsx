@@ -26,6 +26,9 @@ import {
   useUpdateCategoryStatusMutation,
 } from "@/features/categories/api/categoryApi";
 import {
+  useGetAllExamTypesQuery,
+} from "@/features/exams/exam-types/api/examTypes";
+import {
   buildCategoryCreateFormData,
   buildCategoryUpdateFormData,
   extractCategoryFromResponse,
@@ -226,6 +229,7 @@ export function CategoryManager({ initialData }) {
     category: null,
   });
   const [pendingStatusIds, setPendingStatusIds] = useState(() => new Set());
+  const [selectedExamTypes, setSelectedExamTypes] = useState([]);
   const [hasHydratedInitialData, setHasHydratedInitialData] = useState(
     () => !initialData || Boolean(initialData._error),
   );
@@ -315,6 +319,16 @@ export function CategoryManager({ initialData }) {
     [detailData, modalState.category],
   );
 
+  const { data: examTypesData } = useGetAllExamTypesQuery();
+  const examTypeOptions = useMemo(() => {
+    const examTypes = examTypesData?.examTypes || [];
+    return examTypes.map((examType) => ({
+      label: examType.name,
+      value: examType.id,
+      searchText: examType.name,
+    }));
+  }, [examTypesData]);
+
   const currentParentKey = selectedCategory?.id || "root";
   const currentCategories = useMemo(
     () => sortCategories(categoryIndex.childrenMap.get(currentParentKey) || []),
@@ -377,14 +391,17 @@ export function CategoryManager({ initialData }) {
   };
 
   const openCreateModal = () => {
+    setSelectedExamTypes([]);
     setModalState({ isOpen: true, mode: "create", category: null });
   };
 
   const openEditModal = (category) => {
+    setSelectedExamTypes(category.examTypes || []);
     setModalState({ isOpen: true, mode: "edit", category });
   };
 
   const openViewModal = (category) => {
+    setSelectedExamTypes(category.examTypes || []);
     setModalState({ isOpen: true, mode: "view", category });
   };
 
@@ -818,6 +835,9 @@ export function CategoryManager({ initialData }) {
         isSubmitting={isCreating || isUpdating}
         mode={modalState.mode}
         parentOptions={parentOptions}
+        examTypes={selectedExamTypes}
+        examTypeOptions={examTypeOptions}
+        onExamTypesChange={setSelectedExamTypes}
         onClose={closeModal}
         onRetryDetail={refetchDetail}
         onSubmit={handleSubmit}

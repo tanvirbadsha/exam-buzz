@@ -109,6 +109,9 @@ export function CategoryModal({
   onRetryDetail,
   onSubmit,
   parentOptions,
+  examTypes,
+  examTypeOptions,
+  onExamTypesChange,
 }) {
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -190,6 +193,9 @@ export function CategoryModal({
               mode={mode}
               parentOptions={parentOptions}
               submitLabel={submitLabel}
+              examTypes={examTypes}
+              examTypeOptions={examTypeOptions}
+              onExamTypesChange={onExamTypesChange}
               onSubmit={async (categoryInput) => {
                 const wasSuccessful = await onSubmit(categoryInput);
                 if (wasSuccessful) onClose();
