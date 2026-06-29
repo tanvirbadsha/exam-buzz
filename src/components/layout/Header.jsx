@@ -3,23 +3,38 @@
 import { Bell, ChevronRight, LogOut, Menu, ShieldCheck, User } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useSelector } from "react-redux";
 import toast from "react-hot-toast";
 import { useLogoutMutation } from "@/features/auth/api/authApi";
 import { LOGIN_TOAST_KEY } from "@/lib/auth";
+import { selectCurrentRole, selectCurrentUser } from "@/store/authSlice";
 
 export function Header({ onMenuClick }) {
   const pathname = usePathname();
   const router = useRouter();
+  const currentUser = useSelector(selectCurrentUser);
+  const currentRole = useSelector(selectCurrentRole);
   const [logout, { isLoading }] = useLogoutMutation();
 
   const pathSegments = pathname.split("/").filter(Boolean);
+  const displayName = currentUser?.name || "Admin";
+  const roleLabel = currentUser?.isSuperAdmin
+    ? "Super Admin"
+    : currentRole
+      ? currentRole.replace(/\b\w/g, (letter) => letter.toUpperCase())
+      : "Admin";
 
   const handleLogout = async () => {
+    let toastMessage = "Signed out.";
+
     try {
-      await logout().unwrap();
+      const response = await logout().unwrap();
+      toastMessage = response?.message || toastMessage;
+    } catch {
+      toastMessage = "Signed out locally.";
     } finally {
       window.sessionStorage.removeItem(LOGIN_TOAST_KEY);
-      toast.success("Signed out.");
+      toast.success(toastMessage);
       router.replace("/login");
       router.refresh();
     }
@@ -98,10 +113,10 @@ export function Header({ onMenuClick }) {
           </div>
           <div className="hidden text-left lg:block">
             <div className="text-xs font-semibold leading-tight text-foreground">
-              Tanvir Badsha
+              {displayName}
             </div>
             <div className="text-[10px] leading-tight text-muted">
-              Super Admin
+              {roleLabel}
             </div>
           </div>
         </div>

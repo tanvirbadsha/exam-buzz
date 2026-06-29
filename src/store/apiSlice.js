@@ -1,20 +1,12 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { clearCredentials } from "@/store/authSlice";
-import {
-  AUTH_TOKEN_COOKIE_NAME,
-  AUTH_TOKEN_STORAGE_KEY,
-  ROLE_COOKIE_NAME,
-} from "@/lib/auth/constants";
+import { clearAuthTokenCookie, getAuthTokenCookie } from "@/lib/auth";
 
 const baseQuery = fetchBaseQuery({
   baseUrl: process.env.NEXT_PUBLIC_BASE_URL,
   credentials: "include",
   prepareHeaders: (headers, { getState }) => {
-    const token =
-      getState().auth?.token ||
-      (typeof window !== "undefined"
-        ? window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY)
-        : null);
+    const token = getState().auth?.token || getAuthTokenCookie();
 
     headers.set("Accept", "application/json");
 
@@ -35,14 +27,17 @@ async function baseQueryWithAuthGuard(args, api, extraOptions) {
 
   if (result.error && [401, 403].includes(result.error.status)) {
     api.dispatch(clearCredentials());
+    api.dispatch(apiSlice.util.resetApiState());
 
     if (typeof window !== "undefined") {
-      document.cookie = `${ROLE_COOKIE_NAME}=; path=/; max-age=0`;
-      document.cookie = `${AUTH_TOKEN_COOKIE_NAME}=; path=/; max-age=0`;
-      window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+      clearAuthTokenCookie();
 
       if (window.location.pathname !== "/login") {
-        window.location.href = "/login";
+        const loginUrl = new URL("/login", window.location.origin);
+        const callbackUrl = `${window.location.pathname}${window.location.search}`;
+
+        loginUrl.searchParams.set("callbackUrl", callbackUrl);
+        window.location.href = loginUrl.toString();
       }
     }
   }

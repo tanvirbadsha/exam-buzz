@@ -4,11 +4,7 @@ export const ROLES = {
   STUDENT: "student",
 };
 
-// Soft cookie name used by middleware for role-based routing.
-// This is not the backend auth cookie.
-export const ROLE_COOKIE_NAME = "user_role";
 export const AUTH_TOKEN_COOKIE_NAME = "exam_buzz_auth_token";
-export const AUTH_TOKEN_STORAGE_KEY = "exam_buzz_auth_token";
 
 export const PROTECTED_ROUTES = {
   "/admin": [ROLES.ADMIN],

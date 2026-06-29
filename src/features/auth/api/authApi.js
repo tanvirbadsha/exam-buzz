@@ -1,13 +1,7 @@
-import {
-  AUTH_TOKEN_COOKIE_NAME,
-  AUTH_TOKEN_STORAGE_KEY,
-  ROLE_COOKIE_NAME,
-  ROLES,
-} from "@/lib/auth/constants";
+import { ROLES } from "@/lib/auth/constants";
+import { clearAuthTokenCookie, setAuthTokenCookie } from "@/lib/auth";
 import { apiSlice } from "@/store/apiSlice";
 import { clearCredentials, setCredentials } from "@/store/authSlice";
-
-const ROLE_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 
 function getAuthPayload(result) {
   const user = result?.user || result?.admin || null;
@@ -16,32 +10,6 @@ function getAuthPayload(result) {
   const token = result?.token || null;
 
   return { user, role, token };
-}
-
-function setRoleCookie(role) {
-  if (typeof window === "undefined" || !role) return;
-
-  document.cookie = `${ROLE_COOKIE_NAME}=${role}; path=/; max-age=${ROLE_COOKIE_MAX_AGE}; SameSite=Lax`;
-}
-
-function clearRoleCookie() {
-  if (typeof window === "undefined") return;
-
-  document.cookie = `${ROLE_COOKIE_NAME}=; path=/; max-age=0`;
-}
-
-function setAuthToken(token) {
-  if (typeof window === "undefined" || !token) return;
-
-  window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
-  document.cookie = `${AUTH_TOKEN_COOKIE_NAME}=${token}; path=/; max-age=${ROLE_COOKIE_MAX_AGE}; SameSite=Lax`;
-}
-
-function clearAuthToken() {
-  if (typeof window === "undefined") return;
-
-  window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
-  document.cookie = `${AUTH_TOKEN_COOKIE_NAME}=; path=/; max-age=0`;
 }
 
 export const authApi = apiSlice.injectEndpoints({
@@ -58,18 +26,16 @@ export const authApi = apiSlice.injectEndpoints({
           const authPayload = getAuthPayload(responseData);
 
           dispatch(setCredentials(authPayload));
-          setRoleCookie(authPayload.role);
-          setAuthToken(authPayload.token);
+          setAuthTokenCookie(authPayload.token);
         } catch {
           dispatch(clearCredentials());
-          clearRoleCookie();
-          clearAuthToken();
+          clearAuthTokenCookie();
         }
       },
     }),
     logout: builder.mutation({
       query: () => ({
-        url: "/auth/logout",
+        url: "/auth/admin/logout",
         method: "POST",
       }),
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
@@ -78,8 +44,8 @@ export const authApi = apiSlice.injectEndpoints({
         } catch {
         } finally {
           dispatch(clearCredentials());
-          clearRoleCookie();
-          clearAuthToken();
+          clearAuthTokenCookie();
+          dispatch(apiSlice.util.resetApiState());
         }
       },
     }),
@@ -110,6 +76,14 @@ export const authApi = apiSlice.injectEndpoints({
         url: `/auth/admin/get-profile`,
         method: "GET",
       }),
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data: responseData } = await queryFulfilled;
+          dispatch(setCredentials(getAuthPayload(responseData)));
+        } catch {
+          dispatch(clearCredentials());
+        }
+      },
       providesTags: [{ type: "User", id: "Admin-Profile" }],
     }),
     getAdminById: builder.query({

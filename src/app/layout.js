@@ -28,8 +28,9 @@ export default function RootLayout({ children }) {
     >
       <body className="min-h-full">
         <StoreProvider>
-          <AuthInitializer />
-          <AppShell>{children}</AppShell>
+          <AuthInitializer>
+            <AppShell>{children}</AppShell>
+          </AuthInitializer>
         </StoreProvider>
       </body>
     </html>
